@@ -1,0 +1,45 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Debug Exchange UDP Server",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/Exchange/build/bin/program",
+            "args": ["8080"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/Exchange",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "lldb",
+            "preLaunchTask": "Build Exchange",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
+            "name": "Debug Exchange UDP Server (Custom Port)",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/Exchange/build/bin/program",
+            "args": ["9090"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/Exchange",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "lldb",
+            "preLaunchTask": "Build Exchange",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        }
+    ]
+} 
