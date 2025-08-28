@@ -7,6 +7,7 @@
 
 #include "UDPListener.h"
 #include "SocketUtils.h"
+#include "Event.h"
 
 
 std::mutex mtx;
@@ -21,20 +22,13 @@ void signalHandler(int signum) {
     // running = false;
 }
 
-void messageHandler(const std::string& message, const std::string& senderIP) {
-    std::cout << "Received from " << senderIP << ": " << message << std::endl;
+void messageHandler(const std::string& message) {
+    std::cout << "Received: " << message << std::endl;
     
-    std::string trimmedMessage = message;
-    trimmedMessage.erase(0, trimmedMessage.find_first_not_of(" \t\r\n"));
-    trimmedMessage.erase(trimmedMessage.find_last_not_of(" \t\r\n") + 1);
+    EventType eventType = toEventType(message);
     
-    std::string upperMessage = trimmedMessage;
-    std::transform(upperMessage.begin(), upperMessage.end(), upperMessage.begin(), ::toupper);
-    
-    std::cout << "Trimmed message is [" << upperMessage << "]" << std::endl;
-    
-    if (upperMessage == "Q" || upperMessage == "QUIT") {
-        std::cout << "Received quit command from " << senderIP << ". Shutting down..." << std::endl;
+    if (eventType == EventType::Quit) {
+        std::cout << "Received quit command. Shutting down..." << std::endl;
         {
           std::lock_guard<std::mutex> lock{mtx};
           running = false;
@@ -90,7 +84,7 @@ int main(int argc, char* argv[]) {
     std::cout << "Server stopped." << std::endl;
 
     
-    // Cleanup
+    // // Cleanup
     listener.stopListening();
     std::cout << "Server stopped." << std::endl;
     

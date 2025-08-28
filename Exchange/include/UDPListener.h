@@ -12,7 +12,7 @@
 
 class UDPListener {
 public:
-    using MessageCallback = std::function<void(const std::string&, const std::string&)>; // (message, sender_ip)
+    using MessageCallback = std::function<void(const std::string&)>; // (message)
     
     UDPListener(int port);
     ~UDPListener();

@@ -1,6 +1,21 @@
 CXX = g++
 CXXFLAGS = -std=c++20 -Wall -Wextra -pedantic -g -O0 -Iinclude
 
+# Boost library settings
+BOOST_ROOT ?= /opt/homebrew
+BOOST_INCLUDE_DIR = $(BOOST_ROOT)/include
+BOOST_LIB_DIR = $(BOOST_ROOT)/lib
+
+# Add Boost include path
+CXXFLAGS += -I$(BOOST_INCLUDE_DIR)
+
+# Boost libraries to link (add the ones you need)
+BOOST_LIBS =
+#-lboost_filesystem -lboost_thread
+
+# Linker flags
+LDFLAGS = -L$(BOOST_LIB_DIR) $(BOOST_LIBS)
+
 BUILD_DIR = build
 OBJ_DIR = $(BUILD_DIR)/obj
 BIN_DIR = $(BUILD_DIR)/bin
@@ -13,7 +28,7 @@ OBJECTS := $(patsubst src/%.cpp,$(OBJ_DIR)/%.o,$(SOURCES))
 all: $(TARGET)
 
 $(TARGET): $(OBJECTS) | $(BIN_DIR)
-	$(CXX) $(OBJECTS) -o $(TARGET)
+	$(CXX) $(OBJECTS) -o $(TARGET) $(LDFLAGS)
 
 $(OBJ_DIR)/%.o: src/%.cpp | $(OBJ_DIR)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
@@ -37,5 +52,11 @@ help:
 	@echo "  run    - Build and run the program"
 	@echo "  clean  - Remove build directory"
 	@echo "  help   - Show this help message"
+	@echo ""
+	@echo "Boost configuration:"
+	@echo "  BOOST_ROOT=$(BOOST_ROOT)"
+	@echo "  BOOST_INCLUDE_DIR=$(BOOST_INCLUDE_DIR)"
+	@echo "  BOOST_LIB_DIR=$(BOOST_LIB_DIR)"
+	@echo "  BOOST_LIBS=$(BOOST_LIBS)"
 
 .PHONY: all run clean help

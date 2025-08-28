@@ -1,9 +1,13 @@
 #include "UDPListener.h"
+
 #include <iostream>
 #include <cstring>
 #include <unistd.h>
 #include <errno.h>
-#include <fcntl.h>
+
+
+#include "Event.h"
+
 
 UDPListener::UDPListener(int port) : socketFd_(-1), running_(false) {
     // Create UDP socket
@@ -20,19 +24,6 @@ UDPListener::UDPListener(int port) : socketFd_(-1), running_(false) {
         throw std::runtime_error("Failed to set socket options: " + std::string(strerror(errno)));
     }
     
-    // Set socket to non-blocking mode
-    int flags = fcntl(socketFd_, F_GETFL, 0);
-    if (flags < 0) {
-        close(socketFd_);
-        socketFd_ = -1;
-        throw std::runtime_error("Failed to get socket flags: " + std::string(strerror(errno)));
-    }
-    
-    if (fcntl(socketFd_, F_SETFL, flags | O_NONBLOCK) < 0) {
-        close(socketFd_);
-        socketFd_ = -1;
-        throw std::runtime_error("Failed to set socket to non-blocking: " + std::string(strerror(errno)));
-    }
     
     // Bind to port
     struct sockaddr_in serverAddr;
@@ -91,7 +82,7 @@ void UDPListener::listenLoop(MessageCallback callback) {
         // Clear client address structure
         memset(&clientAddr, 0, sizeof(clientAddr));
         
-        // Receive message (non-blocking)
+        // Receive message (blocking)
         ssize_t bytesReceived = recvfrom(socketFd_, buffer, sizeof(buffer) - 1, 0,
                                         (struct sockaddr*)&clientAddr, &clientAddrLen);
         
@@ -99,22 +90,17 @@ void UDPListener::listenLoop(MessageCallback callback) {
             // Null-terminate the received data
             buffer[bytesReceived] = '\0';
             
-            // Get sender IP address
-            char senderIP[INET_ADDRSTRLEN];
-            inet_ntop(AF_INET, &clientAddr.sin_addr, senderIP, INET_ADDRSTRLEN);
+            std::cout << "DEBUG: Received " << bytesReceived << " bytes" << std::endl;
             
-            std::cout << "DEBUG: Received " << bytesReceived << " bytes from " << senderIP << std::endl;
-            
-            callback(std::string(buffer), std::string(senderIP));
-        } else if (bytesReceived < 0) {
-            if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                // No data available (non-blocking socket)
-                // Sleep briefly to avoid busy-waiting
-                std::this_thread::sleep_for(std::chrono::milliseconds(50));
-            } else {
-                // Actual error occurred
-                std::cerr << "Error receiving UDP message: " << strerror(errno) << std::endl;
+            callback(std::string(buffer));
+
+            if (toEventType(std::string(buffer)) == EventType::Quit) {
+              break;
             }
+
+        } else if (bytesReceived < 0) {
+            // Error occurred
+            std::cerr << "Error receiving UDP message: " << strerror(errno) << std::endl;
         }
     }
 } 
