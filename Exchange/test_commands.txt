@@ -1,0 +1,33 @@
+# Test commands for UDP Exchange Server
+# Use these with: echo "command" | nc -u localhost 8080
+
+# Valid commands
+D
+F
+V
+
+# Commands with whitespace (should be trimmed)
+  D  
+  F  
+  V  
+
+# Case variations (should be converted to uppercase)
+d
+f
+v
+
+# Invalid commands (should return Invalid)
+X
+INVALID
+TEST
+HELLO
+
+# Empty lines (should be handled gracefully)
+
+# Commands with newlines
+D
+F
+V 
+
+
+

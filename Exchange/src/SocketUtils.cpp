@@ -5,6 +5,8 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 
+namespace Exchange {
+
 namespace SocketUtils {
 
   class SockFDGuard {
@@ -40,4 +42,6 @@ namespace SocketUtils {
 
     return true;
   }
-} 
+}
+
+} // namespace Exchange

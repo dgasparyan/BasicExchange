@@ -18,16 +18,16 @@ int port;
 void signalHandler(int signum) {
     std::cout << "\nReceived signal " << signum << ". Shutting down..." << std::endl;
     // TODO: Send a message to the listener to stop
-    SocketUtils::sendUDPMessage(port, "QUIT");
+    Exchange::SocketUtils::sendUDPMessage(port, "QUIT");
     // running = false;
 }
 
 void messageHandler(const std::string& message) {
     std::cout << "Received: " << message << std::endl;
     
-    EventType eventType = toEventType(message);
+    Exchange::EventType eventType = Exchange::toEventType(message);
     
-    if (eventType == EventType::Quit) {
+    if (eventType == Exchange::EventType::Quit) {
         std::cout << "Received quit command. Shutting down..." << std::endl;
         {
           std::lock_guard<std::mutex> lock{mtx};
@@ -42,20 +42,28 @@ void printUsage(const char* programName) {
     std::cout << "  port: UDP port to listen on (e.g., 8080)" << std::endl;
 }
 
+int parsePort(const char* portStr) {
+    try {
+        int port = std::stoi(portStr);
+        if (port <= 0 || port > 65535) {
+            throw std::out_of_range("Port out of range");
+        }
+        return port;
+    } catch (const std::exception& e) {
+        throw std::runtime_error("Invalid port number: " + std::string(portStr));
+    }
+}
+
 int main(int argc, char* argv[]) {
     if (argc != 2) {
         printUsage(argv[0]);
         return 1;
     }
     
-    // Parse port number
     try {
-        port = std::stoi(argv[1]);
-        if (port <= 0 || port > 65535) {
-            throw std::out_of_range("Port out of range");
-        }
+        port = parsePort(argv[1]);
     } catch (const std::exception& e) {
-        std::cerr << "Error: Invalid port number '" << argv[1] << "'" << std::endl;
+        std::cerr << "Error: " << e.what() << std::endl;
         printUsage(argv[0]);
         return 1;
     }
@@ -64,28 +72,19 @@ int main(int argc, char* argv[]) {
     signal(SIGINT, signalHandler);
     signal(SIGTERM, signalHandler);
     
-    // Create UDP listener
-    UDPListener listener(port);
+        {
+        Exchange::UDPListener listener(port);
     
-    // Start listening
-    if (!listener.startListening(messageHandler)) {
-        std::cerr << "Failed to start listening: " << listener.getLastError() << std::endl;
-        return 1;
-    }
-    
-    std::cout << "UDP Exchange Server running on port " << port << std::endl;
-    std::cout << "Press Ctrl+C to stop..." << std::endl;
+      std::cout << "UDP Exchange Server running on port " << port << std::endl;
+      std::cout << "Press Ctrl+C to stop..." << std::endl;
 
-    {
-        std::unique_lock<std::mutex> lock{mtx};
-        cv.wait(lock, []{return !running;});
+      auto handle = listener.subscribe(messageHandler);
+
+      std::unique_lock<std::mutex> lock{mtx};
+      cv.wait(lock, []{return !running;});
     }
+    
     std::cout << "Shutting down..." << std::endl;
-    std::cout << "Server stopped." << std::endl;
-
-    
-    // // Cleanup
-    listener.stopListening();
     std::cout << "Server stopped." << std::endl;
     
     return 0;

@@ -34,7 +34,6 @@ Executions will be reported to the console as follows:
 
 
 ===
-===
 
 How to Build and run:
 

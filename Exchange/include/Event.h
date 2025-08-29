@@ -3,6 +3,8 @@
 
 #include <string>
 
+namespace Exchange {
+
 enum class EventType {
     NewOrder,
     CancelOrder,
@@ -18,9 +20,6 @@ enum class EventType {
 EventType toEventType(const std::string& eventType);
 std::string toString(EventType eventType);
 
-
-
-
-
+} // namespace Exchange
 
 #endif // EVENT_H 

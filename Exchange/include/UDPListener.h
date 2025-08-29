@@ -5,33 +5,56 @@
 #include <functional>
 #include <thread>
 #include <atomic>
-#include <stdexcept>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
 
-class UDPListener {
+#include "EventQueue.h"
+
+namespace Exchange {
+
+class UDPListener;
+
+class UdpSubscriptionHandle : public SubscriptionHandle {
 public:
-    using MessageCallback = std::function<void(const std::string&)>; // (message)
-    
-    UDPListener(int port);
+  UdpSubscriptionHandle(UDPListener* listener, int handle);
+  ~UdpSubscriptionHandle();
+
+  UdpSubscriptionHandle(const UdpSubscriptionHandle&) = delete;
+  UdpSubscriptionHandle& operator=(const UdpSubscriptionHandle&) = delete;
+
+  UdpSubscriptionHandle(UdpSubscriptionHandle&& other) = default;
+  UdpSubscriptionHandle& operator=(UdpSubscriptionHandle&& other)  = default;
+
+private:
+  UDPListener* listener_ {nullptr};
+  int handle_ {-1};
+};
+
+class UDPListener : public EventQueue {
+public:
+   
+    explicit UDPListener(int port);
     ~UDPListener();
     
-    bool startListening(MessageCallback callback);
+    [[nodiscard]] std::unique_ptr<SubscriptionHandle> subscribe(MessageCallback callback) override;
     
+private:
+    void bindToPort(int port);
+    bool startListening();
     void stopListening();
-    
-    bool isRunning() const { return running_; }
-    
-    std::string getLastError() const { return lastError_; }
+    void listenLoop();
+
+    friend class UdpSubscriptionHandle;
+    bool unsubscribe(int handle);
 
 private:
     int socketFd_;
+    int port_;
+
+    std::mutex cbMutex_;
+    std::unordered_map<int, MessageCallback> callbacks_;
+
     std::thread listenerThread_;
-    std::atomic<bool> running_;
-    std::string lastError_;
-    
-    void listenLoop(MessageCallback callback);
 };
+
+} // namespace Exchange
 
 #endif // UDP_LISTENER_H 

@@ -1,6 +1,8 @@
 #include "Event.h"
 #include <boost/algorithm/string.hpp>
 
+namespace Exchange {
+
 EventType toEventType(const std::string& eventType) {
     std::string trimmedEvent = eventType;
     boost::algorithm::trim(trimmedEvent);
@@ -35,3 +37,5 @@ std::string toString(EventType eventType) {
             return "Unknown";
     }
 }
+
+} // namespace Exchange
