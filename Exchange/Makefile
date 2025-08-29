@@ -9,29 +9,54 @@ BOOST_LIB_DIR = $(BOOST_ROOT)/lib
 # Add Boost include path
 CXXFLAGS += -I$(BOOST_INCLUDE_DIR)
 
+# Test-specific flags
+TEST_CXXFLAGS = $(CXXFLAGS) -I$(GTEST_INCLUDE_DIR)
+
 # Boost libraries to link (add the ones you need)
 BOOST_LIBS =
 #-lboost_filesystem -lboost_thread
 
+# Google Test settings
+GTEST_DIR ?= /opt/homebrew
+GTEST_INCLUDE_DIR = $(GTEST_DIR)/include
+GTEST_LIB_DIR = $(GTEST_DIR)/lib
+GTEST_LIBS = -lgtest -lgtest_main -lpthread
+
 # Linker flags
 LDFLAGS = -L$(BOOST_LIB_DIR) $(BOOST_LIBS)
+TEST_LDFLAGS = -L$(BOOST_LIB_DIR) -L$(GTEST_LIB_DIR) $(BOOST_LIBS) $(GTEST_LIBS)
 
 BUILD_DIR = build
 OBJ_DIR = $(BUILD_DIR)/obj
 BIN_DIR = $(BUILD_DIR)/bin
 
 TARGET = $(BIN_DIR)/program
+TEST_TARGET = $(BIN_DIR)/run_tests
 
 SOURCES := $(wildcard src/*.cpp)
 OBJECTS := $(patsubst src/%.cpp,$(OBJ_DIR)/%.o,$(SOURCES))
+
+# Test sources exclude main.cpp
+TEST_SOURCES := $(wildcard test/*.cpp)
+TEST_OBJECTS := $(patsubst test/%.cpp,$(OBJ_DIR)/test_%.o,$(TEST_SOURCES))
+
+# Test library objects (exclude main.cpp)
+TEST_LIB_SOURCES := $(filter-out src/main.cpp,$(wildcard src/*.cpp))
+TEST_LIB_OBJECTS := $(patsubst src/%.cpp,$(OBJ_DIR)/%.o,$(TEST_LIB_SOURCES))
 
 all: $(TARGET)
 
 $(TARGET): $(OBJECTS) | $(BIN_DIR)
 	$(CXX) $(OBJECTS) -o $(TARGET) $(LDFLAGS)
 
+$(TEST_TARGET): $(TEST_OBJECTS) $(TEST_LIB_OBJECTS) | $(BIN_DIR)
+	$(CXX) $(TEST_OBJECTS) $(TEST_LIB_OBJECTS) -o $(TEST_TARGET) $(TEST_LDFLAGS)
+
 $(OBJ_DIR)/%.o: src/%.cpp | $(OBJ_DIR)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+$(OBJ_DIR)/test_%.o: test/%.cpp | $(OBJ_DIR)
+	$(CXX) $(TEST_CXXFLAGS) -c $< -o $@
 
 $(OBJ_DIR) $(BIN_DIR):
 	mkdir -p $@
@@ -43,20 +68,40 @@ run: all
 	@echo "Starting UDP server on port $(PORT)..."
 	./$(TARGET) $(PORT)
 
+test: $(TEST_TARGET)
+	@echo "Running tests..."
+	./$(TEST_TARGET)
+
+test-verbose: $(TEST_TARGET)
+	@echo "Running tests with verbose output..."
+	./$(TEST_TARGET) --gtest_verbose
+
+test-filter: $(TEST_TARGET)
+	@echo "Running tests with filter..."
+	./$(TEST_TARGET) --gtest_filter=$(FILTER)
+
 clean:
 	rm -rf $(BUILD_DIR)
 
 help:
 	@echo "Available targets:"
-	@echo "  all    - Build the program (default)"
-	@echo "  run    - Build and run the program"
-	@echo "  clean  - Remove build directory"
-	@echo "  help   - Show this help message"
+	@echo "  all         - Build the program (default)"
+	@echo "  run         - Build and run the program"
+	@echo "  test        - Build and run all tests"
+	@echo "  test-verbose- Run tests with verbose output"
+	@echo "  test-filter - Run tests with filter (set FILTER=pattern)"
+	@echo "  clean       - Remove build directory"
+	@echo "  help        - Show this help message"
 	@echo ""
 	@echo "Boost configuration:"
 	@echo "  BOOST_ROOT=$(BOOST_ROOT)"
 	@echo "  BOOST_INCLUDE_DIR=$(BOOST_INCLUDE_DIR)"
 	@echo "  BOOST_LIB_DIR=$(BOOST_LIB_DIR)"
 	@echo "  BOOST_LIBS=$(BOOST_LIBS)"
+	@echo ""
+	@echo "Google Test configuration:"
+	@echo "  GTEST_DIR=$(GTEST_DIR)"
+	@echo "  GTEST_INCLUDE_DIR=$(GTEST_INCLUDE_DIR)"
+	@echo "  GTEST_LIB_DIR=$(GTEST_LIB_DIR)"
 
-.PHONY: all run clean help
+.PHONY: all run test test-verbose test-filter clean help

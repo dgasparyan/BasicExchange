@@ -10,8 +10,8 @@
 #include <arpa/inet.h>
 
 
-#include "Event.h"
 #include "SocketUtils.h"
+#include "EventParser.h"
 
 namespace Exchange {
 
@@ -122,6 +122,8 @@ void UDPListener::listenLoop() {
             std::cout << "DEBUG: Received " << bytesReceived << " bytes" << std::endl;
             std::string message{buffer};
 
+            // TODO: yes, it's not great calling user-supplied code under our lock. 
+            // either copy/snapshot or do atomic<Umap*> and swap on update
             {
               std::lock_guard<std::mutex> lock(cbMutex_);
               for (const auto& [_, callback] : callbacks_) {

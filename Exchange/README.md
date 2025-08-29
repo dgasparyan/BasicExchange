@@ -3,15 +3,15 @@ Going to build a simple "Exchange".
 We'll process incoming orders from a UDP PORT ($PORT) in the following format:
 # New order
 
-D, UserID, ClinetOrderId, Symbol, Quantity, Type, Side, [Price]
+D, UserID, ClinetOrderId, Symbol, Quantity, Side, Type, [Price]
 
 Type: 
   - Market Order: [Market | 1]
   - Limit Order: [Limit | 2]
 
 Side:
-  - Buy: [B | 1]
-  - Sell: [S | 2]
+  - Buy: [Buy | 1]
+  - Sell: [Sell | 2]
 
 # Cancel Order
 
@@ -42,3 +42,13 @@ How to Build and run:
 
 
 
+
+---
+
+TODO:
+
+- Teting after modernization
+
+- switch to string_view(s) (maybe)
+
+- CRTP event creation (just cause you can ;)

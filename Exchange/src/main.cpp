@@ -8,11 +8,8 @@
 #include "UDPListener.h"
 #include "SocketUtils.h"
 #include "Event.h"
+#include "Exchange.h"
 
-
-std::mutex mtx;
-bool running = true;
-std::condition_variable cv;
 int port;
 
 void signalHandler(int signum) {
@@ -20,21 +17,6 @@ void signalHandler(int signum) {
     // TODO: Send a message to the listener to stop
     Exchange::SocketUtils::sendUDPMessage(port, "QUIT");
     // running = false;
-}
-
-void messageHandler(const std::string& message) {
-    std::cout << "Received: " << message << std::endl;
-    
-    Exchange::EventType eventType = Exchange::toEventType(message);
-    
-    if (eventType == Exchange::EventType::Quit) {
-        std::cout << "Received quit command. Shutting down..." << std::endl;
-        {
-          std::lock_guard<std::mutex> lock{mtx};
-          running = false;
-        }
-        cv.notify_all();
-    }
 }
 
 void printUsage(const char* programName) {
@@ -72,16 +54,15 @@ int main(int argc, char* argv[]) {
     signal(SIGINT, signalHandler);
     signal(SIGTERM, signalHandler);
     
-        {
-        Exchange::UDPListener listener(port);
+    {
+      Exchange::CsvEventParser eventParser;
+      Exchange::UDPListener listener(port);
+      Exchange::Exchange  exchange(listener, eventParser );
     
       std::cout << "UDP Exchange Server running on port " << port << std::endl;
       std::cout << "Press Ctrl+C to stop..." << std::endl;
 
-      auto handle = listener.subscribe(messageHandler);
-
-      std::unique_lock<std::mutex> lock{mtx};
-      cv.wait(lock, []{return !running;});
+      exchange.start();
     }
     
     std::cout << "Shutting down..." << std::endl;
