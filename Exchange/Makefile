@@ -53,10 +53,14 @@ $(TEST_TARGET): $(TEST_OBJECTS) $(TEST_LIB_OBJECTS) | $(BIN_DIR)
 	$(CXX) $(TEST_OBJECTS) $(TEST_LIB_OBJECTS) -o $(TEST_TARGET) $(TEST_LDFLAGS)
 
 $(OBJ_DIR)/%.o: src/%.cpp | $(OBJ_DIR)
-	$(CXX) $(CXXFLAGS) -c $< -o $@
+	$(CXX) $(CXXFLAGS) -MMD -MP -c $< -o $@
 
 $(OBJ_DIR)/test_%.o: test/%.cpp | $(OBJ_DIR)
-	$(CXX) $(TEST_CXXFLAGS) -c $< -o $@
+	$(CXX) $(TEST_CXXFLAGS) -MMD -MP -c $< -o $@
+
+# Include dependency files
+-include $(OBJECTS:.o=.d)
+-include $(TEST_OBJECTS:.o=.d)
 
 $(OBJ_DIR) $(BIN_DIR):
 	mkdir -p $@
@@ -83,6 +87,8 @@ test-filter: $(TEST_TARGET)
 clean:
 	rm -rf $(BUILD_DIR)
 
+force-test: clean test
+
 help:
 	@echo "Available targets:"
 	@echo "  all         - Build the program (default)"
@@ -90,6 +96,7 @@ help:
 	@echo "  test        - Build and run all tests"
 	@echo "  test-verbose- Run tests with verbose output"
 	@echo "  test-filter - Run tests with filter (set FILTER=pattern)"
+	@echo "  force-test  - Clean build and run all tests"
 	@echo "  clean       - Remove build directory"
 	@echo "  help        - Show this help message"
 	@echo ""
@@ -104,4 +111,4 @@ help:
 	@echo "  GTEST_INCLUDE_DIR=$(GTEST_INCLUDE_DIR)"
 	@echo "  GTEST_LIB_DIR=$(GTEST_LIB_DIR)"
 
-.PHONY: all run test test-verbose test-filter clean help
+.PHONY: all run test test-verbose test-filter force-test clean help

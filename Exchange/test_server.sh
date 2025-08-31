@@ -15,15 +15,15 @@ echo "D,user123,1001,AAPL,100,BUY,MARKET" | nc -u -w0 $HOST $PORT
 echo "D,user456,1002,MSFT,50,SELL,LIMIT,150.75" | nc -u -w0 $HOST $PORT
 echo "D,user789,1003,GOOGL,200,BUY,MARKET" | nc -u -w0 $HOST $PORT
 
-# Test CancelOrder commands (F, UserID, OrigOrderId, Symbol)
+# Test CancelOrder commands (F, UserID, ClientOrderId, Symbol, OrigOrderId)
 echo "Testing CancelOrder commands..."
-echo "F,user123,1001,AAPL" | nc -u -w0 $HOST $PORT
-echo "F,user456,1002,MSFT" | nc -u -w0 $HOST $PORT
+echo "F,user123,1001,AAPL,2001" | nc -u -w0 $HOST $PORT
+echo "F,user456,1002,MSFT,2002" | nc -u -w0 $HOST $PORT
 
-# Test TopOfBook commands (V, UserID, Symbol)
+# Test TopOfBook commands (V, UserID, ClientOrderId, Symbol)
 echo "Testing TopOfBook commands..."
-echo "V,user123,AAPL" | nc -u -w0 $HOST $PORT
-echo "V,user456,MSFT" | nc -u -w0 $HOST $PORT
+echo "V,user123,1001,AAPL" | nc -u -w0 $HOST $PORT
+echo "V,user456,1002,MSFT" | nc -u -w0 $HOST $PORT
 
 # Test Quit command (Q)
 # echo "Testing Quit command..."
@@ -33,14 +33,14 @@ echo "V,user456,MSFT" | nc -u -w0 $HOST $PORT
 # Test case variations
 echo "Testing case variations..."
 echo "d,user101,1004,TSLA,75,sell,limit,250.50" | nc -u -w0 $HOST $PORT
-echo "f,user202,1005,NFLX" | nc -u -w0 $HOST $PORT
-echo "v,user303,GOOGL" | nc -u -w0 $HOST $PORT
+echo "f,user202,1005,NFLX,2005" | nc -u -w0 $HOST $PORT
+echo "v,user303,1006,GOOGL" | nc -u -w0 $HOST $PORT
 
 # Test whitespace handling
 echo "Testing whitespace handling..."
 echo " D , user404 , 1006 , AMZN , 100 , BUY , MARKET " | nc -u -w0 $HOST $PORT
-echo " F , user505 , 1007 , META " | nc -u -w0 $HOST $PORT
-echo " V , user606 , NVDA " | nc -u -w0 $HOST $PORT
+echo " F , user505 , 1007 , META , 2007 " | nc -u -w0 $HOST $PORT
+echo " V , user606 , 1008 , NVDA " | nc -u -w0 $HOST $PORT
 
 
 

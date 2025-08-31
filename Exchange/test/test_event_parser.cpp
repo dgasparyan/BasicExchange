@@ -190,11 +190,13 @@ TEST_F(EventParserTest, ParseNewOrder_LargeNumbers) {
 TEST_F(EventParserTest, ParseInvalidEventType) {
     // Test invalid event types for all event categories
     EXPECT_THROW(parser->parse("X,user123,1001,AAPL,100,BUY,MARKET"), std::runtime_error);
+    EXPECT_THROW(parser->parse("Y,user456,1002,MSFT,2001"), std::runtime_error);
+    EXPECT_THROW(parser->parse("Z,user789,1003,GOOGL"), std::runtime_error);
     EXPECT_THROW(parser->parse("INVALID,user101"), std::runtime_error);
 }
 
 TEST_F(EventParserTest, ParseCancelOrder_Valid) {
-    std::string csv = "F,user123,1001,AAPL";
+    std::string csv = "F,user123,1001,AAPL,2001";
     
     auto event = parser->parse(csv);
     
@@ -204,12 +206,12 @@ TEST_F(EventParserTest, ParseCancelOrder_Valid) {
     auto cancelOrderEvent = dynamic_cast<CancelOrderEvent*>(event.get());
     ASSERT_NE(cancelOrderEvent, nullptr);
     EXPECT_EQ(cancelOrderEvent->userId_, "user123");
-    EXPECT_EQ(cancelOrderEvent->origOrderId_, 1001);
+    EXPECT_EQ(cancelOrderEvent->origOrderId_, 2001);
     EXPECT_EQ(cancelOrderEvent->symbol_, "AAPL");
 }
 
 TEST_F(EventParserTest, ParseCancelOrder_WithWhitespace) {
-    std::string csv = " F , user456 , 1002 , MSFT ";
+    std::string csv = " F , user456 , 1002 , MSFT , 2002 ";
     
     auto event = parser->parse(csv);
     
@@ -219,26 +221,26 @@ TEST_F(EventParserTest, ParseCancelOrder_WithWhitespace) {
     auto cancelOrderEvent = dynamic_cast<CancelOrderEvent*>(event.get());
     ASSERT_NE(cancelOrderEvent, nullptr);
     EXPECT_EQ(cancelOrderEvent->userId_, "user456");
-    EXPECT_EQ(cancelOrderEvent->origOrderId_, 1002);
+    EXPECT_EQ(cancelOrderEvent->origOrderId_, 2002);
     EXPECT_EQ(cancelOrderEvent->symbol_, "MSFT");
 }
 
 
 
 TEST_F(EventParserTest, ParseCancelOrder_TooFewTokens) {
-    std::string csv = "F,user101,1004";
+    std::string csv = "F,user101,1004,TSLA";
     
     EXPECT_THROW(parser->parse(csv), std::runtime_error);
 }
 
 TEST_F(EventParserTest, ParseCancelOrder_InvalidOrigOrderId) {
-    std::string csv = "F,user202,abc,TSLA";
+    std::string csv = "F,user202,1005,TSLA,abc";
     
     EXPECT_THROW(parser->parse(csv), std::invalid_argument);
 }
 
 TEST_F(EventParserTest, ParseTopOfBook_Valid) {
-    std::string csv = "V,user123,AAPL";
+    std::string csv = "V,user123,1001,AAPL";
     
     auto event = parser->parse(csv);
     
@@ -252,7 +254,7 @@ TEST_F(EventParserTest, ParseTopOfBook_Valid) {
 }
 
 TEST_F(EventParserTest, ParseTopOfBook_WithWhitespace) {
-    std::string csv = " V , user456 , MSFT ";
+    std::string csv = " V , user456 , 1002 , MSFT ";
     
     auto event = parser->parse(csv);
     
@@ -268,7 +270,7 @@ TEST_F(EventParserTest, ParseTopOfBook_WithWhitespace) {
 
 
 TEST_F(EventParserTest, ParseTopOfBook_TooFewTokens) {
-    std::string csv = "V,user101";
+    std::string csv = "V,user101,1003";
     
     EXPECT_THROW(parser->parse(csv), std::runtime_error);
 }
@@ -295,6 +297,20 @@ TEST_F(EventParserTest, ParseQuit_WithWhitespace) {
     
     auto quitEvent = dynamic_cast<QuitEvent*>(event.get());
     ASSERT_NE(quitEvent, nullptr);
+}
+
+TEST_F(EventParserTest, GetEventType_AllCases) {
+    EXPECT_EQ(parser->getEventType("D,user123,1001,AAPL,100,BUY,MARKET"), EventType::NewOrder);
+    EXPECT_EQ(parser->getEventType("f,user456,1002,MSFT,2001"), EventType::CancelOrder);
+    EXPECT_EQ(parser->getEventType("v   ,user789,1003,GOOGL"), EventType::TopOfBook);
+    EXPECT_EQ(parser->getEventType("q"), EventType::Quit);
+
+
+    EXPECT_EQ(parser->getEventType("Z,user789,1003,GOOGL"), EventType::Invalid);
+    EXPECT_EQ(parser->getEventType("D user789 1003 GOOGL"), EventType::Invalid);
+    EXPECT_EQ(parser->getEventType("   "), EventType::Invalid);
+    EXPECT_EQ(parser->getEventType("\t\r\n"), EventType::Invalid);
+    EXPECT_EQ(parser->getEventType(""), EventType::Invalid);
 }
 
 } // namespace test

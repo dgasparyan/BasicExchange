@@ -13,29 +13,43 @@ EventType Event::type() const {
   return type_;
 }
 
+OrderEvent::OrderEvent(EventType type, const std::string& userId, OrderIdType clientOrderId, const std::string& symbol) noexcept
+  : Event(type), userId_(userId), clientOrderId_(clientOrderId), symbol_(symbol) {}
+
+
+const std::string& OrderEvent::userId() const {
+  return userId_;
+}
+
+const OrderIdType& OrderEvent::clientOrderId() const {
+  return clientOrderId_;
+}
+
+const std::string& OrderEvent::symbol() const {
+  return symbol_;
+}
+
 NewOrderEvent::NewOrderEvent(const std::string& userId, OrderIdType clientOrderId, 
   const std::string& symbol, QuantityType quantity, Side side, Type type, 
-  PriceType price) noexcept : Event(EventType::NewOrder), userId_(userId), clientOrderId_(clientOrderId), 
-  symbol_(symbol), quantity_(quantity), side_(side), type_(type), price_(price) {}
+  PriceType price) noexcept
+  : OrderEvent(EventType::NewOrder, userId, clientOrderId, symbol), quantity_(quantity), side_(side), type_(type), price_(price) {}
 
 
 
-  CancelOrderEvent::CancelOrderEvent(const std::string& userId, OrderIdType origOrderId, const std::string& symbol) noexcept 
-    : Event(EventType::CancelOrder), userId_(userId), origOrderId_(origOrderId), symbol_(symbol) {}
-TopOfBookEvent::TopOfBookEvent(const std::string& userId, const std::string& symbol) noexcept 
-  : Event(EventType::TopOfBook), userId_(userId), symbol_(symbol) {}
-  
+CancelOrderEvent::CancelOrderEvent(const std::string& userId, OrderIdType clientOrderId, const std::string& symbol, OrderIdType origOrderId) noexcept 
+    :  OrderEvent(EventType::CancelOrder, userId, clientOrderId, symbol), origOrderId_(origOrderId) {}
+
+
+TopOfBookEvent::TopOfBookEvent(const std::string& userId, OrderIdType clientOrderId, const std::string& symbol) noexcept 
+  : OrderEvent(EventType::TopOfBook, userId, clientOrderId, symbol) {}
+
 QuitEvent::QuitEvent() noexcept : Event(EventType::Quit) {}
 
 
 
-
-
 EventType toEventType(const std::string& eventType) {
-  std::string trimmedEvent = eventType;
-  boost::algorithm::trim(trimmedEvent);
-  std::string upperEvent = boost::algorithm::to_upper_copy(trimmedEvent);
-
+  auto upperEvent = trimAndUpperCopy(eventType);
+  
   if (upperEvent == "D") {
       return EventType::NewOrder;
   } else if (upperEvent == "F") {

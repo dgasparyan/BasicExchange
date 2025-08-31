@@ -30,45 +30,48 @@ class Event {
     EventType type_;
 };
 
-class NewOrderEvent : public Event {
+class OrderEvent : public Event {
+  public:
+    OrderEvent(EventType type, const std::string& userId, OrderIdType clientOrderId, const std::string& symbol) noexcept;
+
+    virtual const std::string& userId() const;
+    virtual const OrderIdType& clientOrderId() const;
+    virtual const std::string& symbol() const;
+
+  public:
+    std::string userId_ {};
+    OrderIdType clientOrderId_ {};
+    std::string symbol_ {};
+};
+
+class NewOrderEvent : public OrderEvent {
   public:
     NewOrderEvent(const std::string& userId, OrderIdType clientOrderId, const std::string& symbol, QuantityType quantity, Side side, 
                   Type type, PriceType price = INVALID_PRICE) noexcept;
 
   public:
-      std::string userId_ {};
-      OrderIdType clientOrderId_ {};
-      std::string symbol_ {};
-
       QuantityType quantity_ {INVALID_QUANTITY};
       Side side_ {Side::Invalid};
       Type type_ {Type::Invalid};
       PriceType price_ {INVALID_PRICE};
 };
 
-class CancelOrderEvent : public Event {
+class CancelOrderEvent : public OrderEvent {
   public:
-    CancelOrderEvent(const std::string& userId, OrderIdType origOrderId, const std::string& symbol) noexcept;
+    CancelOrderEvent(const std::string& userId, OrderIdType clientOrderId, const std::string& symbol, OrderIdType origOrderId) noexcept;
 
   public:
-    std::string userId_ {};
     OrderIdType origOrderId_ {};
-    std::string symbol_ {};
 };
-class TopOfBookEvent : public Event {
+class TopOfBookEvent : public OrderEvent {
   public:
-    TopOfBookEvent(const std::string& userId, const std::string& symbol) noexcept;
+    TopOfBookEvent(const std::string& userId, OrderIdType clientOrderId, const std::string& symbol) noexcept;
 
-  public:
-    std::string userId_ {};
-    std::string symbol_ {};
 };
+
 class QuitEvent : public Event {
   public:
     QuitEvent() noexcept;
-
-  public:
-    std::string userId_ {};
 };
 
 template<EventType Type>

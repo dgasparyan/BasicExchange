@@ -8,7 +8,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-
+#include <atomic>
 
 #include "SocketUtils.h"
 #include "EventParser.h"
@@ -16,9 +16,9 @@
 namespace Exchange {
 
 namespace {
-  int getNextHandle() {
+  auto getNextHandle() {
     // TODO: This should be randomly generated
-    static int handle = 0;
+    static std::atomic<int> handle {0};
     return handle++;
   }
 }
@@ -45,7 +45,7 @@ UDPListener::~UDPListener() {
 
 std::unique_ptr<SubscriptionHandle> UDPListener::subscribe(MessageCallback callback) {
   std::lock_guard<std::mutex> lock(cbMutex_);
-  int handle = getNextHandle();
+  auto handle = getNextHandle();
   callbacks_[handle] = callback;
   return std::make_unique<UdpSubscriptionHandle>(this, handle);
 }
@@ -128,7 +128,7 @@ void UDPListener::listenLoop() {
               std::lock_guard<std::mutex> lock(cbMutex_);
               for (const auto& [_, callback] : callbacks_) {
                   callback(message);
-              }
+              } 
             }
 
             if (toEventType(std::string(buffer)) == EventType::Quit) {

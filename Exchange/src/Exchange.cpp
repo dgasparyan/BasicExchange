@@ -7,6 +7,7 @@
 
 namespace Exchange {
 
+
 Exchange::Exchange(EventQueue& eventQueue, EventParser& eventParser) : eventParser_(eventParser), eventQueue_(eventQueue){
 }
 
@@ -15,8 +16,7 @@ Exchange::~Exchange() {
 }
 
 void Exchange::start() {
-  // TODO: Start the worker thread
-  eventQueueSubscription_ = eventQueue_.subscribe_with(&Exchange::processEvent, this);
+  eventQueueSubscription_ = eventQueue_.subscribeWith(&Exchange::processEvent, this);
 
   std::unique_lock<std::mutex> lock(stopMutex_);
   stopCondition_.wait(lock, [this] { return stopRequested_; });
@@ -32,20 +32,26 @@ void Exchange::stop() {
 }
 
 void Exchange::processEvent(const std::string& event) {
-    EventType eventType = toEventType(event);
+    EventType eventType = eventParser_.getEventType(event);
     
-    if (eventType == EventType::Quit) {
-      stop();
+    switch (eventType) {
+      case EventType::Quit:
+        stop();
+        break;
+      case EventType::NewOrder:
+      case EventType::CancelOrder:
+      case EventType::TopOfBook:
+        try {
+          auto eventPtr = eventParser_.parse(event);
+          std::cout << "Processed event: " << toString(eventPtr->type()) << std::endl;
+        } catch (const std::exception& e) {
+          std::cerr << "Error processing event: " << e.what() << std::endl;
+        }
+        break;
+      default:
+        std::cerr << "Unknown event type: " << event << std::endl;
+        break;
     }
-    else {
-      try {
-        auto eventPtr = eventParser_.parse(event);
-        std::cout << "Processed event: " << toString(eventPtr->type()) << std::endl;
-      } catch (const std::exception& e) {
-        std::cerr << "Error processing event: " << e.what() << std::endl;
-      }
-    }
-
 }
 
 } // namespace Exchange

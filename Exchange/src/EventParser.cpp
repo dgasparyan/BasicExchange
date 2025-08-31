@@ -20,6 +20,13 @@ namespace {
 
 }
 
+
+EventType CsvEventParser::getEventType(std::string_view event) const {
+  auto trimmedUpper = trimAndUpperCopy(event.substr(0, event.find(',')));
+  return toEventType(trimmedUpper);
+}
+
+
 std::unique_ptr<Event> CsvEventParser::parse(std::string_view event) const {
   auto tokens = parseCSVLine(event);
 

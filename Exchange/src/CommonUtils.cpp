@@ -9,9 +9,8 @@ std::string trimCopy(std::string_view sv, std::string_view separators) {
   if (start == std::string_view::npos) return "";
 
   auto end = sv.find_last_not_of(separators);
-  sv = sv.substr(start, end - start + 1);
 
-  return std::string(sv);
+  return std::string(sv.substr(start, end - start + 1));
 }
 
 std::string trimAndUpperCopy(std::string_view sv, std::string_view separators) {

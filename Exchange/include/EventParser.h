@@ -12,16 +12,26 @@ namespace Exchange {
 
 class EventParser {
 public:
-  virtual std::unique_ptr<Event> parse(std::string_view event) const = 0;
+
   virtual ~EventParser() = default;
+
+  virtual EventType getEventType(std::string_view event) const = 0;
+  virtual std::unique_ptr<Event> parse(std::string_view event) const = 0;
 };
 
 
 class CsvEventParser : public EventParser {
 public:
-    // parses a csv in the format:[D, UserID, ClinetOrderId, Symbol, Quantity, Side, Type, [Price]]
-    std::unique_ptr<Event> parse(std::string_view event) const;
 
+    EventType getEventType(std::string_view event) const override; 
+    // parses a csv in the format:[D, UserID, ClinetOrderId, Symbol, Quantity, Side, Type, [Price]]
+    std::unique_ptr<Event> parse(std::string_view event) const override;
+
+  /*
+      Could definitely just using a "normal" const std::vector<std::string>& argument here but
+      good place to play around with ranges and whatnot so ...  
+  */
+  private:
     template<std::ranges::input_range Range>
     requires std::same_as<std::ranges::range_value_t<Range>, std::string>
     std::unique_ptr<NewOrderEvent> createNewOrderEvent(const Range& r) const {
@@ -44,7 +54,6 @@ public:
       if (++it == std::end(r)) {
         throw std::runtime_error("Not enough tokens in event: Only parsed up to the Symbol: ");
       }
-      // D, UserID, ClinetOrderId, Symbol, Quantity, Side, Type, [Price]
       auto quantity = std::stoi(trimCopy(*it));
       if (++it == std::end(r)) {
         throw std::runtime_error("Not enough tokens in event: Only parsed up to the Quantity: ");
@@ -85,13 +94,17 @@ public:
       if (++it == std::end(r)) {
         throw std::runtime_error("Not enough tokens in event: Only parsed up to the UserID");
       }
-      auto origOrderId = std::stoi(trimCopy(*it));
+      auto clientOrderId = std::stoi(trimCopy(*it));
       if (++it == std::end(r)) {
-        throw std::runtime_error("Not enough tokens in event: Only parsed up to the OrigOrderId");
+        throw std::runtime_error("Not enough tokens in event: Only parsed up to the ClientOrderId");
       }
       auto symbol = trimCopy(*it);
-      
-      return std::make_unique<CancelOrderEvent>(userId, origOrderId, symbol);
+      if (++it == std::end(r)) {
+        throw std::runtime_error("Not enough tokens in event: Only parsed up to the Symbol");
+      }
+      auto origOrderId = std::stoi(trimCopy(*it));
+
+      return std::make_unique<CancelOrderEvent>(userId, clientOrderId, symbol, origOrderId);
     }
 
     template<std::ranges::input_range Range>
@@ -108,9 +121,13 @@ public:
       if (++it == std::end(r)) {
         throw std::runtime_error("Not enough tokens in event: Only parsed up to the UserID");
       }
+      auto clientOrderId = std::stoi(trimCopy(*it));
+      if (++it == std::end(r)) {
+        throw std::runtime_error("Not enough tokens in event: Only parsed up to the ClientOrderId");
+      }
       auto symbol = trimCopy(*it);
       
-      return std::make_unique<TopOfBookEvent>(userId, symbol);
+      return std::make_unique<TopOfBookEvent>(userId, clientOrderId, symbol);
     }
 
     template<std::ranges::input_range Range>

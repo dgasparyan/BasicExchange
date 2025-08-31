@@ -15,11 +15,11 @@ Side:
 
 # Cancel Order
 
-F, UserID, OrigOrderId, Symbol
+F, UserID, ClientOrderId, Symbol, OrigOrderId
 
 # Top Of the Book
 
-V, UserID, Symbol
+V, UserID, ClientOrderId, Symbol
 
 ==== 
 
@@ -52,3 +52,5 @@ TODO:
 - switch to string_view(s) (maybe)
 
 - CRTP event creation (just cause you can ;)
+
+- Add ouw own Order/Event Ids, we don't want to rely on Client's
