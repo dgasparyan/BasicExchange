@@ -2,7 +2,17 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Debug Exchange UDP Server",
+            "name": "Debug Exchange UDP Server (LLDB)",
+            "type": "lldb",
+            "request": "launch",
+            "program": "${workspaceFolder}/Exchange/build/bin/program",
+            "args": ["8080"],
+            "stopAtEntry": false,
+            "cwd": "${workspaceFolder}/Exchange",
+            "preLaunchTask": "Build Exchange"
+        },
+        {
+            "name": "Debug Exchange UDP Server (cppdbg)",
             "type": "cppdbg",
             "request": "launch",
             "program": "${workspaceFolder}/Exchange/build/bin/program",
@@ -12,11 +22,12 @@
             "environment": [],
             "externalConsole": false,
             "MIMode": "lldb",
+            "miDebuggerPath": "/usr/bin/lldb",
             "preLaunchTask": "Build Exchange",
             "setupCommands": [
                 {
-                    "description": "Enable pretty-printing for gdb",
-                    "text": "-enable-pretty-printing",
+                    "description": "Enable pretty-printing for lldb",
+                    "text": "settings set target.print-object-description true",
                     "ignoreFailures": true
                 }
             ]
@@ -32,11 +43,12 @@
             "environment": [],
             "externalConsole": false,
             "MIMode": "lldb",
+            "miDebuggerPath": "/usr/bin/lldb",
             "preLaunchTask": "Build Exchange",
             "setupCommands": [
                 {
-                    "description": "Enable pretty-printing for gdb",
-                    "text": "-enable-pretty-printing",
+                    "description": "Enable pretty-printing for lldb",
+                    "text": "settings set target.print-object-description true",
                     "ignoreFailures": true
                 }
             ]

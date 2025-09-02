@@ -11,8 +11,11 @@
             ],
             "compilerPath": "/usr/bin/g++",
             "cStandard": "c17",
-            "cppStandard": "c++17",
-            "intelliSenseMode": "macos-clang-x64"
+            "cppStandard": "c++23",
+            "intelliSenseMode": "macos-clang-x64",
+            "compilerArgs": [
+                "-fexperimental-library"
+            ]
         }
     ],
     "version": 4

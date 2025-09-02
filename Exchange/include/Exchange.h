@@ -8,24 +8,31 @@
 
 #include "EventQueue.h"
 #include "EventParser.h"
+#include "OrderBookManager.h"
+
 
 namespace Exchange {
 
 class Exchange {
 public:
-    Exchange(EventQueue& eventQueue, EventParser& eventParser);
+    Exchange(EventQueue& eventQueue, EventParser& eventParser, OrderBookManager& orderBookManager);
     ~Exchange();
 
     void start();
 
-    void stop();
 
 private:
     void processEvent(const std::string& event);
 
-private:
-    EventParser& eventParser_;
+    void requestStop();
+    void handleStop();
 
+  private:
+
+    OrderBookManager& orderBookManager_;
+
+
+    EventParser& eventParser_;
     EventQueue& eventQueue_;
     std::unique_ptr<SubscriptionHandle> eventQueueSubscription_;
 

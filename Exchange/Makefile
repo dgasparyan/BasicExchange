@@ -1,5 +1,7 @@
 CXX = g++
-CXXFLAGS = -std=c++20 -Wall -Wextra -pedantic -g -O0 -Iinclude
+CXXFLAGS = -std=c++23 -Wall -Wextra -pedantic -g -O0 -Iinclude -fexperimental-library
+# -fexperimental-library is needed for stop_source and stop_token on Apple Clange 
+
 
 # Boost library settings
 BOOST_ROOT ?= /opt/homebrew
