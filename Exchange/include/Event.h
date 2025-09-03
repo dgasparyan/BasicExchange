@@ -2,6 +2,7 @@
 #define EVENT_H
 
 #include <string>
+#include <variant>
 #include "OrderUtils.h"
 
 namespace Exchange {
@@ -13,41 +14,45 @@ enum class EventType {
 
     Quit,
 
-
-
     Invalid
 };
 
-
-class Event {
+template <class Derived>
+class OrderEvent {
   public:
-    explicit Event(EventType type);
-    virtual ~Event() = 0;
+    OrderEvent(UserIdType userId, OrderIdType clientOrderId, SymbolType symbol) noexcept 
+      : userId_(userId), clientOrderId_(clientOrderId), symbol_(symbol) {}
 
-    virtual EventType type() const;
+    EventType eventType() const noexcept
+    {
+      auto& self = static_cast<const Derived&>(*this);
+      return self.eventType();
+    }
 
-  private:
-    EventType type_;
-};
+    UserIdType userId() const {
+      return userId_;
+    }
+    OrderIdType clientOrderId() const {
+      return clientOrderId_;
+    }
+    SymbolType symbol() const {
+      return symbol_;
+    }
 
-class OrderEvent : public Event {
   public:
-    OrderEvent(EventType type, const std::string& userId, OrderIdType clientOrderId, const std::string& symbol) noexcept;
-
-    virtual const std::string& userId() const;
-    virtual const OrderIdType& clientOrderId() const;
-    virtual const std::string& symbol() const;
-
-  public:
-    std::string userId_ {};
+    UserIdType userId_ {INVALID_USER_ID};
     OrderIdType clientOrderId_ {};
-    std::string symbol_ {};
+    SymbolType symbol_ {};
 };
 
-class NewOrderEvent : public OrderEvent {
+class NewOrderEvent : public OrderEvent<NewOrderEvent> {
   public:
-    NewOrderEvent(const std::string& userId, OrderIdType clientOrderId, const std::string& symbol, QuantityType quantity, Side side, 
+    NewOrderEvent(UserIdType userId, OrderIdType clientOrderId, SymbolType symbol, QuantityType quantity, Side side, 
                   Type type, PriceType price = INVALID_PRICE) noexcept;
+
+    EventType eventType() const noexcept {
+      return EventType::NewOrder;
+    }
 
   public:
       QuantityType quantity_ {INVALID_QUANTITY};
@@ -56,53 +61,40 @@ class NewOrderEvent : public OrderEvent {
       PriceType price_ {INVALID_PRICE};
 };
 
-class CancelOrderEvent : public OrderEvent {
+class CancelOrderEvent : public OrderEvent<CancelOrderEvent> {
   public:
-    CancelOrderEvent(const std::string& userId, OrderIdType clientOrderId, const std::string& symbol, OrderIdType origOrderId) noexcept;
+    CancelOrderEvent(UserIdType userId, OrderIdType clientOrderId, SymbolType symbol, OrderIdType origOrderId) noexcept;
+
+    EventType eventType() const noexcept {
+      return EventType::CancelOrder;
+    }
 
   public:
     OrderIdType origOrderId_ {};
 };
-class TopOfBookEvent : public OrderEvent {
+
+class TopOfBookEvent : public OrderEvent<TopOfBookEvent> {
   public:
-    TopOfBookEvent(const std::string& userId, OrderIdType clientOrderId, const std::string& symbol) noexcept;
+    TopOfBookEvent(UserIdType userId, OrderIdType clientOrderId, SymbolType symbol) noexcept;
+
+    EventType eventType() const noexcept {
+      return EventType::TopOfBook;
+    }
 
 };
 
-class QuitEvent : public Event {
+class QuitEvent {
   public:
-    QuitEvent() noexcept;
-};
-
-template<EventType Type>
-struct EventTraits {
+    EventType eventType() const noexcept {
+      return EventType::Quit;
+    }
 
 };
 
-template<>
-struct EventTraits<EventType::NewOrder> {
-  using EventType = NewOrderEvent;
-  static constexpr const char* name = "NewOrder";
-};
 
-template<>
-struct EventTraits<EventType::CancelOrder> {
-  using EventType = CancelOrderEvent;
-  static constexpr const char* name = "CancelOrder";
-};
+using Event = std::variant<NewOrderEvent, CancelOrderEvent, TopOfBookEvent, QuitEvent>;
 
-template<>
-struct EventTraits<EventType::TopOfBook> {
-  using EventType = TopOfBookEvent;
-  static constexpr const char* name = "TopOfBook";
-};
-
-template<>
-struct EventTraits<EventType::Quit> {
-  using EventType = QuitEvent;
-  static constexpr const char* name = "Quit";
-};
-// struct EventTraits<EventType::Invalid> {
+static_assert(std::is_trivially_copyable_v<Event>, "Event must be trivially copyable so we can use boost lockfree queues");
 
 EventType toEventType(std::string_view eventType);
 std::string toString(EventType eventType);

@@ -38,8 +38,8 @@ void Exchange::handleStop() {
   orderBookManager_.stop();
 }
 
-void Exchange::processEvent(const std::string& event) {
-    EventType eventType = eventParser_.getEventType(event);
+void Exchange::processEvent(const std::string& eventStr) {
+    EventType eventType = eventParser_.getEventType(eventStr);
     
     switch (eventType) {
       case EventType::Quit:
@@ -49,16 +49,15 @@ void Exchange::processEvent(const std::string& event) {
       case EventType::CancelOrder:
       case EventType::TopOfBook:
         try {
-          auto eventPtr = eventParser_.parse(event);
-          std::unique_ptr<OrderEvent> orderEventPtr {static_cast<OrderEvent*>(eventPtr.release())};
-          orderBookManager_.submit(std::move(orderEventPtr));
+          auto event = eventParser_.parse(eventStr);
+          orderBookManager_.submit(std::move(event));
           // std::cout << "Processed event: " << toString(eventPtr->type()) << std::endl;
         } catch (const std::exception& e) {
           std::cerr << "Error processing event: " << e.what() << std::endl;
         }
         break;
       default:
-        std::cerr << "Unknown event type: " << event << std::endl;
+        std::cerr << "Unknown event type: " << eventStr << std::endl;
         break;
     }
 }

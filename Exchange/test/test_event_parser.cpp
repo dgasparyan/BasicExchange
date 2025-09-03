@@ -23,56 +23,50 @@ TEST_F(EventParserTest, ParseNewOrder_ValidMarketOrder) {
     std::string csv = "D,user123,1001,AAPL,100,BUY,MARKET";
     
     auto event = parser->parse(csv);
-    
-    ASSERT_NE(event, nullptr);
-    EXPECT_EQ(event->type(), EventType::NewOrder);
-    
-    auto newOrderEvent = dynamic_cast<NewOrderEvent*>(event.get());
-    ASSERT_NE(newOrderEvent, nullptr);
-    EXPECT_EQ(newOrderEvent->userId_, "user123");
-    EXPECT_EQ(newOrderEvent->clientOrderId_, 1001);
-    EXPECT_EQ(newOrderEvent->symbol_, "AAPL");
-    EXPECT_EQ(newOrderEvent->quantity_, 100);
-    EXPECT_EQ(newOrderEvent->side_, Side::Buy);
-    EXPECT_EQ(newOrderEvent->type_, Type::Market);
-    EXPECT_EQ(newOrderEvent->price_, INVALID_PRICE);
+    NewOrderEvent newOrderEvent = std::get<NewOrderEvent>(event);
+
+    EXPECT_EQ(newOrderEvent.eventType(), EventType::NewOrder);
+
+    EXPECT_EQ(newOrderEvent.userId_, UserIdType("user123"));
+    EXPECT_EQ(newOrderEvent.clientOrderId_, 1001);
+    EXPECT_EQ(newOrderEvent.symbol_, "AAPL"_sym);
+    EXPECT_EQ(newOrderEvent.quantity_, 100);
+    EXPECT_EQ(newOrderEvent.side_, Side::Buy);
+    EXPECT_EQ(newOrderEvent.type_, Type::Market);
+    EXPECT_EQ(newOrderEvent.price_, INVALID_PRICE);
 }
+
 
 TEST_F(EventParserTest, ParseNewOrder_ValidLimitOrder) {
     std::string csv = "D,user456,1002,MSFT,50,SELL,LIMIT,150.75";
     
     auto event = parser->parse(csv);
-    
-    ASSERT_NE(event, nullptr);
-    EXPECT_EQ(event->type(), EventType::NewOrder);
-    
-    auto newOrderEvent = dynamic_cast<NewOrderEvent*>(event.get());
-    ASSERT_NE(newOrderEvent, nullptr);
-    EXPECT_EQ(newOrderEvent->userId_, "user456");
-    EXPECT_EQ(newOrderEvent->clientOrderId_, 1002);
-    EXPECT_EQ(newOrderEvent->symbol_, "MSFT");
-    EXPECT_EQ(newOrderEvent->quantity_, 50);
-    EXPECT_EQ(newOrderEvent->side_, Side::Sell);
-    EXPECT_EQ(newOrderEvent->type_, Type::Limit);
-    EXPECT_DOUBLE_EQ(newOrderEvent->price_, 150.75);
+    NewOrderEvent newOrderEvent = std::get<NewOrderEvent>(event);
+
+    EXPECT_EQ(newOrderEvent.eventType(), EventType::NewOrder);
+    EXPECT_EQ(newOrderEvent.userId_, UserIdType("user456"));
+    EXPECT_EQ(newOrderEvent.clientOrderId_, 1002);
+    EXPECT_EQ(newOrderEvent.symbol_, "MSFT"_sym);
+    EXPECT_EQ(newOrderEvent.quantity_, 50);
+    EXPECT_EQ(newOrderEvent.side_, Side::Sell);
+    EXPECT_EQ(newOrderEvent.type_, Type::Limit);
+    EXPECT_DOUBLE_EQ(newOrderEvent.price_, 150.75);
 }
 
 TEST_F(EventParserTest, ParseNewOrder_WithWhitespace) {
     std::string csv = " D , user789 , 1003 , GOOGL , 200 , BUY , MARKET ";
     
     auto event = parser->parse(csv);
+    NewOrderEvent newOrderEvent = std::get<NewOrderEvent>(event);
     
-    ASSERT_NE(event, nullptr);
-    EXPECT_EQ(event->type(), EventType::NewOrder);
+    EXPECT_EQ(newOrderEvent.eventType(), EventType::NewOrder);
     
-    auto newOrderEvent = dynamic_cast<NewOrderEvent*>(event.get());
-    ASSERT_NE(newOrderEvent, nullptr);
-    EXPECT_EQ(newOrderEvent->userId_, "user789");
-    EXPECT_EQ(newOrderEvent->clientOrderId_, 1003);
-    EXPECT_EQ(newOrderEvent->symbol_, "GOOGL");
-    EXPECT_EQ(newOrderEvent->quantity_, 200);
-    EXPECT_EQ(newOrderEvent->side_, Side::Buy);
-    EXPECT_EQ(newOrderEvent->type_, Type::Market);
+    EXPECT_EQ(newOrderEvent.userId_, UserIdType("user789"));
+    EXPECT_EQ(newOrderEvent.clientOrderId_, 1003);
+    EXPECT_EQ(newOrderEvent.symbol_, "GOOGL"_sym);
+    EXPECT_EQ(newOrderEvent.quantity_, 200);
+    EXPECT_EQ(newOrderEvent.side_, Side::Buy);
+    EXPECT_EQ(newOrderEvent.type_, Type::Market);
 }
 
 TEST_F(EventParserTest, ParseNewOrder_CaseInsensitive) {
@@ -80,18 +74,16 @@ TEST_F(EventParserTest, ParseNewOrder_CaseInsensitive) {
     
     auto event = parser->parse(csv);
     
-    ASSERT_NE(event, nullptr);
-    EXPECT_EQ(event->type(), EventType::NewOrder);
+    NewOrderEvent newOrderEvent = std::get<NewOrderEvent>(event);
     
-    auto newOrderEvent = dynamic_cast<NewOrderEvent*>(event.get());
-    ASSERT_NE(newOrderEvent, nullptr);
-    EXPECT_EQ(newOrderEvent->userId_, "user101");
-    EXPECT_EQ(newOrderEvent->clientOrderId_, 1004);
-    EXPECT_EQ(newOrderEvent->symbol_, "TSLA");
-    EXPECT_EQ(newOrderEvent->quantity_, 75);
-    EXPECT_EQ(newOrderEvent->side_, Side::Sell);
-    EXPECT_EQ(newOrderEvent->type_, Type::Limit);
-    EXPECT_DOUBLE_EQ(newOrderEvent->price_, 250.50);
+    EXPECT_EQ(newOrderEvent.eventType(), EventType::NewOrder);
+    EXPECT_EQ(newOrderEvent.userId_, UserIdType("user101"));
+    EXPECT_EQ(newOrderEvent.clientOrderId_, 1004);
+    EXPECT_EQ(newOrderEvent.symbol_, "TSLA"_sym);
+    EXPECT_EQ(newOrderEvent.quantity_, 75);
+    EXPECT_EQ(newOrderEvent.side_, Side::Sell);
+    EXPECT_EQ(newOrderEvent.type_, Type::Limit);
+    EXPECT_DOUBLE_EQ(newOrderEvent.price_, 250.50);
 }
 
 TEST_F(EventParserTest, ParseNewOrder_ShortForm) {
@@ -99,22 +91,20 @@ TEST_F(EventParserTest, ParseNewOrder_ShortForm) {
     
     auto event = parser->parse(csv);
     
-    ASSERT_NE(event, nullptr);
-    EXPECT_EQ(event->type(), EventType::NewOrder);
+    NewOrderEvent newOrderEvent = std::get<NewOrderEvent>(event);
     
-    auto newOrderEvent = dynamic_cast<NewOrderEvent*>(event.get());
-    ASSERT_NE(newOrderEvent, nullptr);
-    EXPECT_EQ(newOrderEvent->userId_, "user202");
-    EXPECT_EQ(newOrderEvent->clientOrderId_, 1005);
-    EXPECT_EQ(newOrderEvent->symbol_, "NFLX");
-    EXPECT_EQ(newOrderEvent->quantity_, 25);
-    EXPECT_EQ(newOrderEvent->side_, Side::Buy);
-    EXPECT_EQ(newOrderEvent->type_, Type::Limit);
-    EXPECT_DOUBLE_EQ(newOrderEvent->price_, 180.25);
+    EXPECT_EQ(newOrderEvent.eventType(), EventType::NewOrder);
+    EXPECT_EQ(newOrderEvent.userId_, UserIdType("user202"));
+    EXPECT_EQ(newOrderEvent.clientOrderId_, 1005);
+    EXPECT_EQ(newOrderEvent.symbol_, "NFLX"_sym);
+    EXPECT_EQ(newOrderEvent.quantity_, 25);
+    EXPECT_EQ(newOrderEvent.side_, Side::Buy);
+    EXPECT_EQ(newOrderEvent.type_, Type::Limit);
+    EXPECT_DOUBLE_EQ(newOrderEvent.price_, 180.25);
 }
 
 TEST_F(EventParserTest, ParseNewOrder_InvalidSide) {
-    std::string csv = "D,user404,1007,META,50,HOLD,MARKET";
+    std::string csv = "D,INVALID_ID,1007,META,50,HOLD,MARKET";
     
     EXPECT_THROW(parser->parse(csv), std::runtime_error);
 }
@@ -166,12 +156,10 @@ TEST_F(EventParserTest, ParseNewOrder_ZeroQuantity) {
     
     auto event = parser->parse(csv);
     
-    ASSERT_NE(event, nullptr);
-    EXPECT_EQ(event->type(), EventType::NewOrder);
+    NewOrderEvent newOrderEvent = std::get<NewOrderEvent>(event);
     
-    auto newOrderEvent = dynamic_cast<NewOrderEvent*>(event.get());
-    ASSERT_NE(newOrderEvent, nullptr);
-    EXPECT_EQ(newOrderEvent->quantity_, 0);
+    EXPECT_EQ(newOrderEvent.eventType(), EventType::NewOrder);
+    EXPECT_EQ(newOrderEvent.quantity_, 0);
 }
 
 TEST_F(EventParserTest, ParseNewOrder_LargeNumbers) {
@@ -179,14 +167,12 @@ TEST_F(EventParserTest, ParseNewOrder_LargeNumbers) {
     
     auto event = parser->parse(csv);
     
-    ASSERT_NE(event, nullptr);
-    EXPECT_EQ(event->type(), EventType::NewOrder);
+    NewOrderEvent newOrderEvent = std::get<NewOrderEvent>(event);
     
-    auto newOrderEvent = dynamic_cast<NewOrderEvent*>(event.get());
-    ASSERT_NE(newOrderEvent, nullptr);
-    EXPECT_EQ(newOrderEvent->clientOrderId_, 999999);
-    EXPECT_EQ(newOrderEvent->quantity_, 1000000);
-    EXPECT_DOUBLE_EQ(newOrderEvent->price_, 999999.99);
+    EXPECT_EQ(newOrderEvent.eventType(), EventType::NewOrder);
+    EXPECT_EQ(newOrderEvent.clientOrderId_, 999999);
+    EXPECT_EQ(newOrderEvent.quantity_, 1000000);
+    EXPECT_DOUBLE_EQ(newOrderEvent.price_, 999999.99);
 }
 
 TEST_F(EventParserTest, ParseInvalidEventType) {
@@ -202,14 +188,12 @@ TEST_F(EventParserTest, ParseCancelOrder_Valid) {
     
     auto event = parser->parse(csv);
     
-    ASSERT_NE(event, nullptr);
-    EXPECT_EQ(event->type(), EventType::CancelOrder);
+    CancelOrderEvent cancelOrderEvent = std::get<CancelOrderEvent>(event);
     
-    auto cancelOrderEvent = dynamic_cast<CancelOrderEvent*>(event.get());
-    ASSERT_NE(cancelOrderEvent, nullptr);
-    EXPECT_EQ(cancelOrderEvent->userId_, "user123");
-    EXPECT_EQ(cancelOrderEvent->origOrderId_, 2001);
-    EXPECT_EQ(cancelOrderEvent->symbol_, "AAPL");
+    EXPECT_EQ(cancelOrderEvent.eventType(), EventType::CancelOrder);
+    EXPECT_EQ(cancelOrderEvent.userId_, UserIdType("user123"));
+    EXPECT_EQ(cancelOrderEvent.origOrderId_, 2001);
+    EXPECT_EQ(cancelOrderEvent.symbol_, "AAPL"_sym);
 }
 
 TEST_F(EventParserTest, ParseCancelOrder_WithWhitespace) {
@@ -217,14 +201,12 @@ TEST_F(EventParserTest, ParseCancelOrder_WithWhitespace) {
     
     auto event = parser->parse(csv);
     
-    ASSERT_NE(event, nullptr);
-    EXPECT_EQ(event->type(), EventType::CancelOrder);
+    CancelOrderEvent cancelOrderEvent = std::get<CancelOrderEvent>(event);
     
-    auto cancelOrderEvent = dynamic_cast<CancelOrderEvent*>(event.get());
-    ASSERT_NE(cancelOrderEvent, nullptr);
-    EXPECT_EQ(cancelOrderEvent->userId_, "user456");
-    EXPECT_EQ(cancelOrderEvent->origOrderId_, 2002);
-    EXPECT_EQ(cancelOrderEvent->symbol_, "MSFT");
+    EXPECT_EQ(cancelOrderEvent.eventType(), EventType::CancelOrder);
+    EXPECT_EQ(cancelOrderEvent.userId_, UserIdType("user456"));
+    EXPECT_EQ(cancelOrderEvent.origOrderId_, 2002);
+    EXPECT_EQ(cancelOrderEvent.symbol_, "MSFT"_sym);
 }
 
 
@@ -246,13 +228,11 @@ TEST_F(EventParserTest, ParseTopOfBook_Valid) {
     
     auto event = parser->parse(csv);
     
-    ASSERT_NE(event, nullptr);
-    EXPECT_EQ(event->type(), EventType::TopOfBook);
+    TopOfBookEvent topOfBookEvent = std::get<TopOfBookEvent>(event);
     
-    auto topOfBookEvent = dynamic_cast<TopOfBookEvent*>(event.get());
-    ASSERT_NE(topOfBookEvent, nullptr);
-    EXPECT_EQ(topOfBookEvent->userId_, "user123");
-    EXPECT_EQ(topOfBookEvent->symbol_, "AAPL");
+    EXPECT_EQ(topOfBookEvent.eventType(), EventType::TopOfBook);
+    EXPECT_EQ(topOfBookEvent.userId_, UserIdType("user123"));
+    EXPECT_EQ(topOfBookEvent.symbol_, "AAPL"_sym);
 }
 
 TEST_F(EventParserTest, ParseTopOfBook_WithWhitespace) {
@@ -260,13 +240,11 @@ TEST_F(EventParserTest, ParseTopOfBook_WithWhitespace) {
     
     auto event = parser->parse(csv);
     
-    ASSERT_NE(event, nullptr);
-    EXPECT_EQ(event->type(), EventType::TopOfBook);
+    TopOfBookEvent topOfBookEvent = std::get<TopOfBookEvent>(event);
     
-    auto topOfBookEvent = dynamic_cast<TopOfBookEvent*>(event.get());
-    ASSERT_NE(topOfBookEvent, nullptr);
-    EXPECT_EQ(topOfBookEvent->userId_, "user456");
-    EXPECT_EQ(topOfBookEvent->symbol_, "MSFT");
+    EXPECT_EQ(topOfBookEvent.eventType(), EventType::TopOfBook);
+    EXPECT_EQ(topOfBookEvent.userId_, UserIdType("user456"));
+    EXPECT_EQ(topOfBookEvent.symbol_, "MSFT"_sym);
 }
 
 
@@ -282,11 +260,8 @@ TEST_F(EventParserTest, ParseQuit_Valid) {
     
     auto event = parser->parse(csv);
     
-    ASSERT_NE(event, nullptr);
-    EXPECT_EQ(event->type(), EventType::Quit);
-    
-    auto quitEvent = dynamic_cast<QuitEvent*>(event.get());
-    ASSERT_NE(quitEvent, nullptr);
+    QuitEvent quitEvent = std::get<QuitEvent>(event);
+    EXPECT_EQ(quitEvent.eventType(), EventType::Quit);
 }
 
 TEST_F(EventParserTest, ParseQuit_WithWhitespace) {
@@ -294,11 +269,8 @@ TEST_F(EventParserTest, ParseQuit_WithWhitespace) {
     
     auto event = parser->parse(csv);
     
-    ASSERT_NE(event, nullptr);
-    EXPECT_EQ(event->type(), EventType::Quit);
-    
-    auto quitEvent = dynamic_cast<QuitEvent*>(event.get());
-    ASSERT_NE(quitEvent, nullptr);
+    QuitEvent quitEvent = std::get<QuitEvent>(event);
+    EXPECT_EQ(quitEvent.eventType(), EventType::Quit);
 }
 
 TEST_F(EventParserTest, GetEventType_AllCases) {
@@ -320,14 +292,14 @@ TEST_F(EventParserTest, CreateNewOrderEvent_VariousRanges) {
    std::list<std::string> tokens = {"D", "user456", "1002", "MSFT", "50", "SELL", "LIMIT", "150.75"};
     
     auto verify = [](const auto& event) {
-      ASSERT_NE(event, nullptr);
-      EXPECT_EQ(event->userId_, "user456");
-      EXPECT_EQ(event->clientOrderId_, 1002);
-      EXPECT_EQ(event->symbol_, "MSFT");
-      EXPECT_EQ(event->quantity_, 50);
-      EXPECT_EQ(event->side_, Side::Sell);
-      EXPECT_EQ(event->type_, Type::Limit);
-      EXPECT_DOUBLE_EQ(event->price_, 150.75);
+      NewOrderEvent newOrderEvent = std::get<NewOrderEvent>(event);
+      EXPECT_EQ(newOrderEvent.userId_, UserIdType("user456"));  
+      EXPECT_EQ(newOrderEvent.clientOrderId_, 1002);
+      EXPECT_EQ(newOrderEvent.symbol_, "MSFT"_sym);
+      EXPECT_EQ(newOrderEvent.quantity_, 50);
+      EXPECT_EQ(newOrderEvent.side_, Side::Sell);
+      EXPECT_EQ(newOrderEvent.type_, Type::Limit);
+      EXPECT_DOUBLE_EQ(newOrderEvent.price_, 150.75);
     };
     
     { // const lvalue
@@ -352,11 +324,11 @@ TEST_F(EventParserTest, CreateCancelOrderEvent_VariousRanges) {
   std::list<std::string> tokens {"F", "user123", "1001", "AAPL", "2001"};
 
     auto verify = [](const auto& event) {
-      ASSERT_NE(event, nullptr);
-      EXPECT_EQ(event->userId_, "user123");
-      EXPECT_EQ(event->clientOrderId_, 1001);
-      EXPECT_EQ(event->symbol_, "AAPL");
-      EXPECT_EQ(event->origOrderId_, 2001);
+      CancelOrderEvent cancelOrderEvent = std::get<CancelOrderEvent>(event);
+      EXPECT_EQ(cancelOrderEvent.userId_, UserIdType("user123"));
+      EXPECT_EQ(cancelOrderEvent.clientOrderId_, 1001);
+      EXPECT_EQ(cancelOrderEvent.symbol_, "AAPL"_sym);
+      EXPECT_EQ(cancelOrderEvent.origOrderId_, 2001);
     };
 
     {
@@ -382,10 +354,10 @@ TEST_F(EventParserTest, CreateTopOfBookEvent_VariousRanges) {
   std::list<std::string> tokens {"V", "user456", "1002", "MSFT"};
 
   auto verify = [](const auto& event) {
-    ASSERT_NE(event, nullptr);
-    EXPECT_EQ(event->userId_, "user456");
-    EXPECT_EQ(event->clientOrderId_, 1002);
-    EXPECT_EQ(event->symbol_, "MSFT");
+    TopOfBookEvent topOfBookEvent = std::get<TopOfBookEvent>(event);
+    EXPECT_EQ(topOfBookEvent.userId_, UserIdType("user456"));
+    EXPECT_EQ(topOfBookEvent.clientOrderId_, 1002);
+    EXPECT_EQ(topOfBookEvent.symbol_, "MSFT"_sym );
   };
 
   {
@@ -409,8 +381,8 @@ TEST_F(EventParserTest, CreateQuitEvent_VariousRanges) {
   std::list<std::string> tokens {"Q"};
 
   auto verify = [](const auto& event) {
-    ASSERT_NE(event, nullptr);
-    EXPECT_EQ(event->type(), EventType::Quit);
+    QuitEvent quitEvent = std::get<QuitEvent>(event);
+    EXPECT_EQ(quitEvent.eventType(), EventType::Quit);
   };
 
   {

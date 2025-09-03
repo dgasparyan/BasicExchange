@@ -52,24 +52,24 @@ void OrderBookManager::processEvents() {
   }
 }
 
-void OrderBookManager::processEvent(std::unique_ptr<OrderEvent> event) {
+void OrderBookManager::processEvent(Event event) {
   // orderBooks_[event->symbol()]->submit(std::move(event));
   std::this_thread::sleep_for(std::chrono::milliseconds(50));
 }
 
-bool OrderBookManager::submit(std::unique_ptr<OrderEvent> event) {
+bool OrderBookManager::submit(Event event) {
   // return orderBooks_[event->symbol()]->submit(std::move(event));
-  std::cout << "OrderBookManager::submit" << toString(event->type()) << std::endl;
+  std::cout << "OrderBookManager::submit" << std::endl;
   if (stopSource_.stop_requested()) {
     return false;
   }
 
-  
   {
     std::lock_guard<std::mutex> lock(mutex_);
     eventQueue_.push(std::move(event));
     cv_.notify_all();
   }
+
   return true;
 }
 
