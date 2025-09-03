@@ -47,7 +47,7 @@ QuitEvent::QuitEvent() noexcept : Event(EventType::Quit) {}
 
 
 
-EventType toEventType(const std::string& eventType) {
+EventType toEventType(std::string_view eventType) {
   auto upperEvent = trimAndUpperCopy(eventType);
   
   if (upperEvent == "D") {

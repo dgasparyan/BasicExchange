@@ -104,7 +104,7 @@ struct EventTraits<EventType::Quit> {
 };
 // struct EventTraits<EventType::Invalid> {
 
-EventType toEventType(const std::string& eventType);
+EventType toEventType(std::string_view eventType);
 std::string toString(EventType eventType);
 
 

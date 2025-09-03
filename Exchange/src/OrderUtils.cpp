@@ -11,7 +11,7 @@ namespace {
   static const char* LIMIT = "LIMIT";
 }
 
-Side toSide(const std::string& side) {
+Side toSide(std::string_view side) {
     auto upperSide = trimAndUpperCopy(side);
     
     if (upperSide == BUY || upperSide == "1") {
@@ -23,7 +23,7 @@ Side toSide(const std::string& side) {
     return Side::Invalid;
 }
 
-Type toType(const std::string& type) {
+Type toType(std::string_view type) {
     auto upperType = trimAndUpperCopy(type);
     
     if (upperType == MARKET || upperType == "1") {

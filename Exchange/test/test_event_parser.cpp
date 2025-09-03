@@ -1,10 +1,13 @@
 #include <gtest/gtest.h>
 #include "EventParser.h"
 
+#include <list>
+
 namespace Exchange {
-namespace test {
 
 class EventParserTest : public ::testing::Test {
+  protected:
+    std::unique_ptr<Exchange::CsvEventParser> parser;
 protected:
     void SetUp() override {
         parser = std::make_unique<CsvEventParser>();
@@ -14,7 +17,6 @@ protected:
         // Cleanup code that will be called after each test
     }
 
-    std::unique_ptr<CsvEventParser> parser;
 };
 
 TEST_F(EventParserTest, ParseNewOrder_ValidMarketOrder) {
@@ -313,5 +315,121 @@ TEST_F(EventParserTest, GetEventType_AllCases) {
     EXPECT_EQ(parser->getEventType(""), EventType::Invalid);
 }
 
-} // namespace test
+// Test private template methods directly with different range types
+TEST_F(EventParserTest, CreateNewOrderEvent_VariousRanges) {
+   std::list<std::string> tokens = {"D", "user456", "1002", "MSFT", "50", "SELL", "LIMIT", "150.75"};
+    
+    auto verify = [](const auto& event) {
+      ASSERT_NE(event, nullptr);
+      EXPECT_EQ(event->userId_, "user456");
+      EXPECT_EQ(event->clientOrderId_, 1002);
+      EXPECT_EQ(event->symbol_, "MSFT");
+      EXPECT_EQ(event->quantity_, 50);
+      EXPECT_EQ(event->side_, Side::Sell);
+      EXPECT_EQ(event->type_, Type::Limit);
+      EXPECT_DOUBLE_EQ(event->price_, 150.75);
+    };
+    
+    { // const lvalue
+      const auto const_tokens = tokens;
+      auto event = parser->createNewOrderEvent(const_tokens);
+      verify(event);
+    }
+
+    { // rvalue
+      auto event = parser->createNewOrderEvent(std::move(tokens));
+      verify(event);
+    }
+
+    { // initializer list
+      auto event = parser->createNewOrderEvent({"D", "user456", "1002", "MSFT", "50", "SELL", "LIMIT", "150.75"});
+      verify(event);
+    }
+    
+}
+
+TEST_F(EventParserTest, CreateCancelOrderEvent_VariousRanges) {
+  std::list<std::string> tokens {"F", "user123", "1001", "AAPL", "2001"};
+
+    auto verify = [](const auto& event) {
+      ASSERT_NE(event, nullptr);
+      EXPECT_EQ(event->userId_, "user123");
+      EXPECT_EQ(event->clientOrderId_, 1001);
+      EXPECT_EQ(event->symbol_, "AAPL");
+      EXPECT_EQ(event->origOrderId_, 2001);
+    };
+
+    {
+      const auto const_tokens = tokens;
+      auto event = parser->createCancelOrderEvent(const_tokens);
+      verify(event);
+    }
+
+    {// test with rvalue
+      auto event = parser->createCancelOrderEvent(std::move(tokens));
+      verify(event);
+    }
+
+    {// initializer list
+      auto event = parser->createCancelOrderEvent({"F", "user123", "1001", "AAPL", "2001"});
+      verify(event);
+    }
+    
+}
+
+
+TEST_F(EventParserTest, CreateTopOfBookEvent_VariousRanges) {
+  std::list<std::string> tokens {"V", "user456", "1002", "MSFT"};
+
+  auto verify = [](const auto& event) {
+    ASSERT_NE(event, nullptr);
+    EXPECT_EQ(event->userId_, "user456");
+    EXPECT_EQ(event->clientOrderId_, 1002);
+    EXPECT_EQ(event->symbol_, "MSFT");
+  };
+
+  {
+    const auto const_tokens = tokens;
+    auto event = parser->createTopOfBookEvent(const_tokens);
+    verify(event);
+  }
+
+  {
+    auto event = parser->createTopOfBookEvent(std::move(tokens));
+    verify(event);
+  }
+
+  {
+    auto event = parser->createTopOfBookEvent({"V", "user456", "1002", "MSFT"});
+    verify(event);
+  }
+}
+
+TEST_F(EventParserTest, CreateQuitEvent_VariousRanges) {
+  std::list<std::string> tokens {"Q"};
+
+  auto verify = [](const auto& event) {
+    ASSERT_NE(event, nullptr);
+    EXPECT_EQ(event->type(), EventType::Quit);
+  };
+
+  {
+    const auto const_tokens = tokens;
+    auto event = parser->createQuitEvent(const_tokens);
+    verify(event);
+  }
+
+
+  {
+    auto event = parser->createQuitEvent(std::move(tokens));
+    verify(event);
+  }
+
+
+  {
+    auto event = parser->createQuitEvent({"Q"});
+    verify(event);
+  }
+}
+
 } // namespace Exchange 

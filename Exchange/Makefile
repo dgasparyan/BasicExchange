@@ -11,8 +11,8 @@ BOOST_LIB_DIR = $(BOOST_ROOT)/lib
 # Add Boost include path
 CXXFLAGS += -I$(BOOST_INCLUDE_DIR)
 
-# Test-specific flags
-TEST_CXXFLAGS = $(CXXFLAGS) -I$(GTEST_INCLUDE_DIR)
+# Test-specific flags (includes UNIT_TESTS macro for friend class access)
+TEST_CXXFLAGS = $(CXXFLAGS) -I$(GTEST_INCLUDE_DIR) -DUNIT_TESTS
 
 # Boost libraries to link (add the ones you need)
 BOOST_LIBS =
@@ -44,7 +44,7 @@ TEST_OBJECTS := $(patsubst test/%.cpp,$(OBJ_DIR)/test_%.o,$(TEST_SOURCES))
 
 # Test library objects (exclude main.cpp)
 TEST_LIB_SOURCES := $(filter-out src/main.cpp,$(wildcard src/*.cpp))
-TEST_LIB_OBJECTS := $(patsubst src/%.cpp,$(OBJ_DIR)/%.o,$(TEST_LIB_SOURCES))
+TEST_LIB_OBJECTS := $(patsubst src/%.cpp,$(OBJ_DIR)/test_lib_%.o,$(TEST_LIB_SOURCES))
 
 all: $(TARGET)
 
@@ -56,6 +56,10 @@ $(TEST_TARGET): $(TEST_OBJECTS) $(TEST_LIB_OBJECTS) | $(BIN_DIR)
 
 $(OBJ_DIR)/%.o: src/%.cpp | $(OBJ_DIR)
 	$(CXX) $(CXXFLAGS) -MMD -MP -c $< -o $@
+
+# Test library objects (compiled with UNIT_TESTS macro)
+$(OBJ_DIR)/test_lib_%.o: src/%.cpp | $(OBJ_DIR)
+	$(CXX) $(CXXFLAGS) -DUNIT_TESTS -MMD -MP -c $< -o $@
 
 $(OBJ_DIR)/test_%.o: test/%.cpp | $(OBJ_DIR)
 	$(CXX) $(TEST_CXXFLAGS) -MMD -MP -c $< -o $@

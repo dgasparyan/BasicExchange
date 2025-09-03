@@ -23,8 +23,8 @@ namespace Exchange {
     Invalid = 99,
   };
 
-  Side toSide(const std::string& side);
-  Type toType(const std::string& type);
+  Side toSide(std::string_view side);
+  Type toType(std::string_view type);
 
   // TODO: change to a precise, comparatable type 
   using PriceType = double;
