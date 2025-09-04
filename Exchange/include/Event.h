@@ -1,7 +1,6 @@
 #ifndef EVENT_H
 #define EVENT_H
 
-#include <string>
 #include <variant>
 #include "OrderUtils.h"
 
@@ -17,9 +16,12 @@ enum class EventType {
     Invalid
 };
 
+
+
 template <class Derived>
 class OrderEvent {
   public:
+
     OrderEvent(UserIdType userId, OrderIdType clientOrderId, SymbolType symbol) noexcept 
       : userId_(userId), clientOrderId_(clientOrderId), symbol_(symbol) {}
 
@@ -39,10 +41,16 @@ class OrderEvent {
       return symbol_;
     }
 
+    TimestampType timestamp() const noexcept {
+      return timestamp_;
+    }
+
   public:
     UserIdType userId_ {INVALID_USER_ID};
     OrderIdType clientOrderId_ {};
     SymbolType symbol_ {};
+
+    TimestampType timestamp_ {std::chrono::steady_clock::now()};
 };
 
 class NewOrderEvent : public OrderEvent<NewOrderEvent> {
@@ -92,7 +100,7 @@ class QuitEvent {
 };
 
 
-using Event = std::variant<NewOrderEvent, CancelOrderEvent, TopOfBookEvent, QuitEvent>;
+using Event = std::variant<std::monostate, NewOrderEvent, CancelOrderEvent, TopOfBookEvent, QuitEvent>;
 
 static_assert(std::is_trivially_copyable_v<Event>, "Event must be trivially copyable so we can use boost lockfree queues");
 

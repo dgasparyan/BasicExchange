@@ -201,10 +201,16 @@ public:
       return createQuitEvent(il.begin(), il.end());
     }
 
+
+
+#ifdef UNIT_TESTS
+
     EP_FRIEND_TEST(EventParserTest, CreateNewOrderEvent_VariousRanges)
     EP_FRIEND_TEST(EventParserTest, CreateCancelOrderEvent_VariousRanges)
     EP_FRIEND_TEST(EventParserTest, CreateTopOfBookEvent_VariousRanges)
     EP_FRIEND_TEST(EventParserTest, CreateQuitEvent_VariousRanges)
+#endif
+
 
 };
 

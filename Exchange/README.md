@@ -57,3 +57,7 @@ TODO:
 
 - Add a config and get a list of supported symbols from there, Change OrderBookManager to use that list and 
   create The orderBooks by cloning so we can test it better
+
+  -- Decide on what to do with leftover events when stopping.
+
+  -- better error/exception handling (like if the queue is full, or event processing throws etc)

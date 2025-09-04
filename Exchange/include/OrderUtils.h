@@ -2,7 +2,10 @@
 #define ORDER_UTILS_H
 
 #include <string>
+#include <chrono>
+
 #include "FixedString.h"
+
 
 namespace Exchange {
   // keep FIX api values
@@ -26,13 +29,6 @@ namespace Exchange {
 
   Side toSide(std::string_view side);
   Type toType(std::string_view type);
-
-
-  #include <array>
-  #include <string_view>
-  #include <compare>
-  #include <type_traits>
-  #include <cstring>
   
 
   
@@ -59,6 +55,7 @@ namespace Exchange {
       return SymbolType(std::string_view{s, n}); // no unbounded scan, compile-time length
   }
 
+  using TimestampType = std::chrono::steady_clock::time_point;
 
 
 } // namespace Exchange

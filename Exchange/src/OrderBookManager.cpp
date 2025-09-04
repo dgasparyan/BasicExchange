@@ -5,10 +5,26 @@
 
 namespace Exchange {
 
+  namespace {
+
+    constexpr unsigned MAX_BATCH_SIZE = 32;
+    constexpr unsigned QUEUE_CAPACITY = 1024;
+
+
+    void backoff(unsigned n) {
+      if (n < 32) std::this_thread::yield();
+      else std::this_thread::sleep_for(std::chrono::microseconds(1));
+  }
+  
+  }
 
 IOrderBookManager::~IOrderBookManager() = default;
 
-OrderBookManager::OrderBookManager(OrderBookManager::OrderBookMap&& map, int numThreads) : orderBooks_(std::move(map)) {
+OrderBookManager::OrderBookManager(OrderBookManager::OrderBookMap&& map, int numThreads) 
+: orderBooks_(std::move(map)), eventQueue_(QUEUE_CAPACITY) {
+  
+  // at least 2 threads otherwise what's even the point amirite
+  numThreads = std::max(2, numThreads);
   std::cout << "OrderBookManager::OrderBookManager: numThreads: " << numThreads << std::endl;
   for (int i = 0; i < numThreads; ++i) {
     threads_.emplace_back([this]() { processEvents(); });
@@ -19,38 +35,44 @@ OrderBookManager::~OrderBookManager() {
   stop();
 }
 
-
 void OrderBookManager::stop() {
-  stopSource_.request_stop();
-  cv_.notify_all();
+  if (!stopRequested_.exchange(true)) {
+    semaphore_.release(threads_.size());
 
-  // manually join here, we don't want it processing stuff after it's stoppped
+    // a.k.a. join
+    threads_.clear();
+  }
 }
 
 void OrderBookManager::processEvents() {
   while (true) {
-      std::unique_lock<std::mutex> lock(mutex_);
-      cv_.wait(lock, stopSource_.get_token(), [this] { return !eventQueue_.empty(); });
-      if (stopSource_.stop_requested()) {
+    semaphore_.acquire();
+      if (stopRequested_.load()) {
         break;
       }
+      Event event;
 
-      // process all of the events
-      while (true) {
-        // std::unique_lock<std::mutx> lock(mutex_);
-        std::cout << std::this_thread::get_id() << " OrderBookManager::processEvents: Queue size: " << eventQueue_.size() << std::endl;
-        if (eventQueue_.empty()) {
-          break;
-        }
-        auto event = std::move(eventQueue_.front());
-        eventQueue_.pop();
-        lock.unlock();
-        // TODO: try/catch here
-        processEvent(std::move(event));
-        lock.lock();
+      unsigned int spinCount {0};
+      while (!eventQueue_.pop(event)) {
+        backoff(spinCount++);
+      }
+      processEvent(std::move(event));
+
+      // opportunistic batching
+      unsigned int grabbed {0};
+      while (!stopRequested_.load() && grabbed < MAX_BATCH_SIZE && semaphore_.try_acquire()) {
+          if (stopRequested_.load(std::memory_order_relaxed)) {
+            semaphore_.release(); // return the token so a blocked worker can wake
+            break;
+          }
+
+          if (eventQueue_.pop(event)) { processEvent(std::move(event)); ++grabbed; }
+          else { semaphore_.release(1); break; } // return token if we lost the race
+      }
+      
+      
     }
   }
-}
 
 void OrderBookManager::processEvent(Event event) {
   // orderBooks_[event->symbol()]->submit(std::move(event));
@@ -59,16 +81,16 @@ void OrderBookManager::processEvent(Event event) {
 
 bool OrderBookManager::submit(Event event) {
   // return orderBooks_[event->symbol()]->submit(std::move(event));
-  std::cout << "OrderBookManager::submit" << std::endl;
-  if (stopSource_.stop_requested()) {
+  // std::cout << "OrderBookManager::submit" << std::endl;
+  if (stopRequested_.load()) {
     return false;
   }
 
-  {
-    std::lock_guard<std::mutex> lock(mutex_);
-    eventQueue_.push(std::move(event));
-    cv_.notify_all();
+  if (!eventQueue_.push(std::move(event))) {
+    // std::cout << "OrderBookManager::submit: Queue is full" << std::endl;
+    return false;
   }
+  semaphore_.release(1);
 
   return true;
 }
