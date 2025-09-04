@@ -2,6 +2,10 @@
 #define ORDER_UTILS_H
 
 #include <string>
+#include <chrono>
+
+#include "FixedString.h"
+
 
 namespace Exchange {
   // keep FIX api values
@@ -25,7 +29,9 @@ namespace Exchange {
 
   Side toSide(std::string_view side);
   Type toType(std::string_view type);
+  
 
+  
   // TODO: change to a precise, comparatable type 
   using PriceType = double;
   constexpr PriceType INVALID_PRICE = -1;
@@ -35,6 +41,21 @@ namespace Exchange {
 
   using QuantityType = int;
   constexpr QuantityType INVALID_QUANTITY = -1;
+
+  using UserIdType = FixedString<32>;
+  constexpr UserIdType INVALID_USER_ID {};
+  constexpr UserIdType operator"" _uid(const char* s, std::size_t n) {
+      return UserIdType(std::string_view{s, n}); // no unbounded scan, compile-time length
+  }
+  
+
+  using SymbolType = FixedString<8>;
+  constexpr SymbolType INVALID_SYMBOL {};
+  constexpr SymbolType operator"" _sym(const char* s, std::size_t n) {
+      return SymbolType(std::string_view{s, n}); // no unbounded scan, compile-time length
+  }
+
+  using TimestampType = std::chrono::steady_clock::time_point;
 
 
 } // namespace Exchange

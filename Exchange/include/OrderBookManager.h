@@ -2,11 +2,12 @@
 #define ORDER_BOOK_MANAGER_H
 
 #include <unordered_map>
-#include <queue>
-#include <mutex>
 #include <thread>
-#include <condition_variable>
-#include <stop_token>
+#include <semaphore>
+#include <atomic>
+#include <vector>
+
+#include <boost/lockfree/queue.hpp>
 
 #include "OrderBook.h"
 #include "Event.h"
@@ -17,7 +18,7 @@ namespace Exchange {
   public:
     virtual ~IOrderBookManager() = 0;
 
-    virtual bool submit(std::unique_ptr<OrderEvent> event) = 0;
+    virtual bool submit(Event event) = 0;
 
   };
 
@@ -29,24 +30,26 @@ public:
 
     ~OrderBookManager();
 
-    bool submit(std::unique_ptr<OrderEvent> event) override;
+    bool submit(Event event) override;
 
     void stop();
 
   private:
     void processEvents();
 
-    void processEvent(std::unique_ptr<OrderEvent> event);
+    void processEvent(Event event);
 
   private:
-    OrderBookMap orderBooks_;
+    // kust be initialized fully before we access cuz 
+    // going to do it concurrently
+    const OrderBookMap orderBooks_;
 
-    std::queue<std::unique_ptr<OrderEvent>> eventQueue_;
+    static_assert(std::is_trivially_copyable_v<Event>, "Event must be trivially copyable for lock-free queue");
+    boost::lockfree::queue<Event> eventQueue_;
 
-    std::mutex mutex_;
-    std::condition_variable_any cv_;
+    std::counting_semaphore<> semaphore_{ 0};
+    std::atomic<bool> stopRequested_ {false};
 
-    std::stop_source stopSource_;
     std::vector<std::jthread> threads_;
 };
 

@@ -17,47 +17,47 @@ protected:
 
 
 TEST_F(EventTest, NewOrderEvent_Construction) {
-    auto event = std::make_unique<NewOrderEvent>("user1", 1001, "AAPL", 100, Side::Buy, Type::Limit, 150.50);
+    NewOrderEvent event("user1"_uid, 1001, "AAPL"_sym, 100, Side::Buy, Type::Limit, 150.50);
     
-    EXPECT_EQ(event->type(), EventType::NewOrder);
-    EXPECT_EQ(event->userId_, "user1");
-    EXPECT_EQ(event->clientOrderId_, 1001);
-    EXPECT_EQ(event->symbol_, "AAPL");
-    EXPECT_EQ(event->quantity_, 100);
-    EXPECT_EQ(event->side_, Side::Buy);
-    EXPECT_EQ(event->type_, Type::Limit);
-    EXPECT_EQ(event->price_, 150.50);
+    EXPECT_EQ(event.eventType(), EventType::NewOrder);
+    EXPECT_EQ(event.userId_, "user1"_uid);
+    EXPECT_EQ(event.clientOrderId_, 1001);
+    EXPECT_EQ(event.symbol_, "AAPL"_sym);
+    EXPECT_EQ(event.quantity_, 100);
+    EXPECT_EQ(event.side_, Side::Buy);
+    EXPECT_EQ(event.type_, Type::Limit);
+    EXPECT_EQ(event.price_, 150.50);
 }
 
 TEST_F(EventTest, NewOrderEvent_DefaultPrice) {
-    auto event = std::make_unique<NewOrderEvent>("user1", 1001, "AAPL", 100, Side::Buy, Type::Limit);
+    NewOrderEvent event("user1"_uid, 1001, "AAPL"_sym, 100, Side::Buy, Type::Limit);
     
-    EXPECT_EQ(event->price_, INVALID_PRICE);
+    EXPECT_EQ(event.price_, INVALID_PRICE);
 }
 
 TEST_F(EventTest, CancelOrderEvent_Construction) {
-    auto event = std::make_unique<CancelOrderEvent>("user123", 1001, "AAPL", 2001);
+    CancelOrderEvent event("user123"_uid, 1001, "AAPL"_sym, 2001);
     
-    EXPECT_EQ(event->type(), EventType::CancelOrder);
-    EXPECT_EQ(event->userId_, "user123");
-    EXPECT_EQ(event->clientOrderId_, 1001);
-    EXPECT_EQ(event->symbol_, "AAPL");
-    EXPECT_EQ(event->origOrderId_, 2001);
+    EXPECT_EQ(event.eventType(), EventType::CancelOrder);
+    EXPECT_EQ(event.userId_, "user123"_uid);
+    EXPECT_EQ(event.clientOrderId_, 1001);
+    EXPECT_EQ(event.symbol_, "AAPL"_sym);
+    EXPECT_EQ(event.origOrderId_, 2001);
 }
 
 TEST_F(EventTest, TopOfBookEvent_Construction) {
-    auto event = std::make_unique<TopOfBookEvent>("user123", 1001, "AAPL");
+    TopOfBookEvent event("user123"_uid, 1001, "AAPL"_sym);
     
-    EXPECT_EQ(event->type(), EventType::TopOfBook);
-    EXPECT_EQ(event->userId_, "user123");
-    EXPECT_EQ(event->clientOrderId_, 1001);
-    EXPECT_EQ(event->symbol_, "AAPL");
+    EXPECT_EQ(event.eventType(), EventType::TopOfBook);
+    EXPECT_EQ(event.userId_, "user123"_uid);
+    EXPECT_EQ(event.clientOrderId_, 1001);
+    EXPECT_EQ(event.symbol_, "AAPL"_sym);
 }
 
+
 TEST_F(EventTest, QuitEvent_Construction) {
-    auto event = std::make_unique<QuitEvent>();
-    
-    EXPECT_EQ(event->type(), EventType::Quit);
+    QuitEvent  event;
+    EXPECT_EQ(event.eventType(), EventType::Quit);
 }
 
 TEST_F(EventTest, ToEventType_ValidTypes) {
@@ -88,20 +88,7 @@ TEST_F(EventTest, ToEventType_InvalidTypes) {
     EXPECT_EQ(toEventType("CANCEL"), EventType::Invalid);
 }
 
-TEST_F(EventTest, ToString_ValidTypes) {
-    EXPECT_EQ(toString(EventType::NewOrder), "NewOrder");
-    EXPECT_EQ(toString(EventType::CancelOrder), "CancelOrder");
-    EXPECT_EQ(toString(EventType::TopOfBook), "TopOfBook");
-    EXPECT_EQ(toString(EventType::Quit), "Quit");
-    EXPECT_EQ(toString(EventType::Invalid), "Invalid");
-}
-
-TEST_F(EventTest, EventTraits) {
-    EXPECT_STREQ(EventTraits<EventType::NewOrder>::name, "NewOrder");
-    EXPECT_STREQ(EventTraits<EventType::CancelOrder>::name, "CancelOrder");
-    EXPECT_STREQ(EventTraits<EventType::TopOfBook>::name, "TopOfBook");
-    EXPECT_STREQ(EventTraits<EventType::Quit>::name, "Quit");
-}
-
 } // namespace test
+
+
 } // namespace Exchange 

@@ -27,7 +27,7 @@ EventType CsvEventParser::getEventType(std::string_view event) const {
 }
 
 
-std::unique_ptr<Event> CsvEventParser::parse(std::string_view event) const {
+Event CsvEventParser::parse(std::string_view event) const {
   auto tokens = parseCSVLine(event);
 
   if (tokens.size() < 1 ) {
