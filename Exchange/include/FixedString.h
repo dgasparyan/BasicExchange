@@ -6,6 +6,8 @@
 #include <compare>
 #include <type_traits>
 #include <cstring>
+#include <functional>
+#include <ostream>
 
 template<std::size_t Capacity, bool NullTerminated = true>
 class FixedString {
@@ -56,6 +58,20 @@ public:
         return std::string_view{a.buf_.data(), a.len_} <=> std::string_view{b.buf_.data(), b.len_};
     }
 };
+
+template<std::size_t C, bool NT>
+std::ostream& operator<<(std::ostream& os, const FixedString<C, NT>& s) {
+    return os.write(s.data(), static_cast<std::streamsize>(s.size()));
+}
+
+namespace std {
+  template<std::size_t C, bool NT>
+  struct hash<FixedString<C, NT>> {
+    size_t operator()(const FixedString<C, NT>& s) const noexcept {
+      return std::hash<std::string_view>{}(s.view());
+    }
+  };
+}
 
 static_assert(std::is_trivially_copyable_v<FixedString<32>>);
 

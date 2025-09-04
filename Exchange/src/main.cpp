@@ -60,7 +60,7 @@ int main(int argc, char* argv[]) {
       Exchange::UDPListener listener(port);
 
       Exchange::OrderBookManager::OrderBookMap orderBookMap;
-      for (const auto& symbol : {"AAPL", "GOOGL", "MSFT", "AMZN", "META", "NVDA"}) {
+      for (std::string_view symbol : {"AAPL", "GOOGL", "MSFT", "AMZN", "META", "NVDA"}) {
         orderBookMap.emplace(symbol, std::make_unique<Exchange::OrderBook>());
       }
       // const auto numThreads = std  ::max(static_cast<int>(std::thread::hardware_concurrency() / 2), 2);

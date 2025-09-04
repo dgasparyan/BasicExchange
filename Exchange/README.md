@@ -51,8 +51,6 @@ TODO:
 
 - switch to string_view(s) (maybe)
 
-- CRTP event creation (just cause you can ;)
-
 - Add ouw own Order/Event Ids, we don't want to rely on Client's
 
 - Add a config and get a list of supported symbols from there, Change OrderBookManager to use that list and 

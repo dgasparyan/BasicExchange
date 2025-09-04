@@ -75,8 +75,32 @@ void OrderBookManager::processEvents() {
   }
 
 void OrderBookManager::processEvent(Event event) {
-  // orderBooks_[event->symbol()]->submit(std::move(event));
-  std::this_thread::sleep_for(std::chrono::milliseconds(50));
+
+  auto findAndInvoke = [this](auto&& event, auto&& memFunc) {
+    auto it = orderBooks_.find(event.symbol());
+    if (it != orderBooks_.end()) {
+      std::invoke(memFunc, (*it->second), std::forward<decltype(event)>(event));
+    }
+    else {
+      std::cout << "OrderBookManager::processEvent: Symbol not found: " << toString(event.eventType()) << " " << event.symbol() << std::endl;
+    }
+  };
+
+  std::visit([findAndInvoke](auto&& event) {
+    using T = std::decay_t<decltype(event)>;
+    if constexpr (std::is_same_v<T, NewOrderEvent>) {
+      findAndInvoke(std::forward<decltype(event)>(event), &IOrderBook::submitNewOrder);
+    }
+    else if constexpr (std::is_same_v<T, CancelOrderEvent>) {
+      findAndInvoke(std::forward<decltype(event)>(event), &IOrderBook::submitCancelOrder);
+    }
+    else if constexpr (std::is_same_v<T, TopOfBookEvent>) {
+      findAndInvoke(std::forward<decltype(event)>(event), &IOrderBook::submitTopOfBook);
+    } 
+    else
+        std::cout << "Unknown Event "  << '\n';
+  }, std::move(event));
+
 }
 
 bool OrderBookManager::submit(Event event) {

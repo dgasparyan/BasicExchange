@@ -62,6 +62,19 @@ class NewOrderEvent : public OrderEvent<NewOrderEvent> {
       return EventType::NewOrder;
     }
 
+    QuantityType quantity() const {
+      return quantity_;
+    }
+    Side side() const {
+      return side_;
+    }
+    Type type() const {
+      return type_;
+    }
+    PriceType price() const {
+      return price_;
+    }
+
   public:
       QuantityType quantity_ {INVALID_QUANTITY};
       Side side_ {Side::Invalid};

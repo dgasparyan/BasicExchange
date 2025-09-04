@@ -11,6 +11,7 @@
 
 #include "OrderBook.h"
 #include "Event.h"
+#include "OrderUtils.h"
 
 namespace Exchange {
 
@@ -24,7 +25,7 @@ namespace Exchange {
 
 class OrderBookManager : public IOrderBookManager {
 public:
-    using OrderBookMap = std::unordered_map<std::string, std::unique_ptr<IOrderBook>>;
+    using OrderBookMap = std::unordered_map<SymbolType, std::unique_ptr<IOrderBook>>;
 
     OrderBookManager(OrderBookMap && map, int numThreads = std::thread::hardware_concurrency() / 2);
 

@@ -35,6 +35,7 @@ namespace Exchange {
   // TODO: change to a precise, comparatable type 
   using PriceType = double;
   constexpr PriceType INVALID_PRICE = -1;
+  constexpr PriceType MARKET_PRICE = std::numeric_limits<PriceType>::max();
 
   using OrderIdType = int;
   constexpr OrderIdType INVALID_ORDER_ID = -1;
