@@ -23,7 +23,7 @@ template <class Derived>
 class OrderEvent {
   public:
 
-    OrderEvent(UserIdType userId, OrderIdType clientOrderId, SymbolType symbol) noexcept 
+    OrderEvent(UserId userId, OrderId clientOrderId, Symbol symbol) noexcept 
       : userId_(userId), clientOrderId_(clientOrderId), symbol_(symbol) {}
 
     EventType eventType() const noexcept
@@ -32,38 +32,38 @@ class OrderEvent {
       return self.eventType();
     }
 
-    UserIdType userId() const {
+    UserId userId() const {
       return userId_;
     }
-    OrderIdType clientOrderId() const {
+    OrderId clientOrderId() const {
       return clientOrderId_;
     }
-    SymbolType symbol() const {
+    Symbol symbol() const {
       return symbol_;
     }
 
-    TimestampType timestamp() const noexcept {
+    Timestamp timestamp() const noexcept {
       return timestamp_;
     }
 
   public:
-    UserIdType userId_ {INVALID_USER_ID};
-    OrderIdType clientOrderId_ {};
-    SymbolType symbol_ {};
+    UserId userId_ {INVALID_USER_ID};
+    OrderId clientOrderId_ {};
+    Symbol symbol_ {};
 
-    TimestampType timestamp_ {std::chrono::steady_clock::now()};
+    Timestamp timestamp_ {std::chrono::steady_clock::now()};
 };
 
 class NewOrderEvent : public OrderEvent<NewOrderEvent> {
   public:
-    NewOrderEvent(UserIdType userId, OrderIdType clientOrderId, SymbolType symbol, QuantityType quantity, Side side, 
-                  Type type, PriceType price = INVALID_PRICE) noexcept;
+    NewOrderEvent(UserId userId, OrderId clientOrderId, Symbol symbol, Quantity quantity, Side side, 
+                  Type type, Price price = INVALID_PRICE) noexcept;
 
     EventType eventType() const noexcept {
       return EventType::NewOrder;
     }
 
-    QuantityType quantity() const {
+    Quantity quantity() const {
       return quantity_;
     }
     Side side() const {
@@ -72,32 +72,32 @@ class NewOrderEvent : public OrderEvent<NewOrderEvent> {
     Type type() const {
       return type_;
     }
-    PriceType price() const {
+    Price price() const {
       return price_;
     }
 
   public:
-      QuantityType quantity_ {INVALID_QUANTITY};
+      Quantity quantity_ {INVALID_QUANTITY};
       Side side_ {Side::Invalid};
       Type type_ {Type::Invalid};
-      PriceType price_ {INVALID_PRICE};
+      Price price_ {INVALID_PRICE};
 };
 
 class CancelOrderEvent : public OrderEvent<CancelOrderEvent> {
   public:
-    CancelOrderEvent(UserIdType userId, OrderIdType clientOrderId, SymbolType symbol, OrderIdType origOrderId) noexcept;
+    CancelOrderEvent(UserId userId, OrderId clientOrderId, Symbol symbol, OrderId origOrderId) noexcept;
 
     EventType eventType() const noexcept {
       return EventType::CancelOrder;
     }
 
   public:
-    OrderIdType origOrderId_ {};
+    OrderId origOrderId_ {};
 };
 
 class TopOfBookEvent : public OrderEvent<TopOfBookEvent> {
   public:
-    TopOfBookEvent(UserIdType userId, OrderIdType clientOrderId, SymbolType symbol) noexcept;
+    TopOfBookEvent(UserId userId, OrderId clientOrderId, Symbol symbol) noexcept;
 
     EventType eventType() const noexcept {
       return EventType::TopOfBook;
@@ -118,7 +118,7 @@ using EventVariant = std::variant<std::monostate, NewOrderEvent, CancelOrderEven
 
 template <class T>
 concept HasSymbol = requires (const T& event) {
-  { event.symbol() } -> std::convertible_to<SymbolType>;
+      { event.symbol() } -> std::convertible_to<Symbol>;
 };
 
 template <class T>
@@ -135,7 +135,7 @@ struct Event {
   
   Event() = default;
 
-  SymbolType symbol() const {
+      Symbol symbol() const {
     auto visitor = [](auto&& event) {
       using T = std::decay_t<decltype(event)>;
       if constexpr (HasSymbol<T>) {
@@ -151,7 +151,7 @@ struct Event {
     return std::visit(visitor, data_);
   }
 
-  // SymbolType symbol_ {INVALID_SYMBOL};
+      // Symbol symbol_ {INVALID_SYMBOL};
   EventVariant data_ {};
 };
 

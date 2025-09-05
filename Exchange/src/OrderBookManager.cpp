@@ -29,7 +29,7 @@ OrderBookManager::OrderBookManager(OrderBookManager::OrderBookMap&& map, int num
 
   // TOOD: move to ConfigManager and clone the given map
   for (std::string_view symStr : {"AAPL", "GOOGL", "MSFT", "AMZN", "META", "NVDA"}) {
-    auto symbol = SymbolType{symStr};
+    auto symbol = Symbol{symStr};
     auto it = map.find(symbol);
     shards_[shardIdx(symbol)]->orderBooks_[symbol] = (it == map.end() ? std::make_unique<OrderBook>() : std::move(it->second));
   }
@@ -59,8 +59,8 @@ bool OrderBookManager::submit(Event event) {
   return shards_[idx]->submit(std::move(event));
 }
 
-size_t OrderBookManager::shardIdx(SymbolType symbol) const {
-  return std::hash<SymbolType>()(symbol) % shards_.size();
+size_t OrderBookManager::shardIdx(Symbol symbol) const {
+  return std::hash<Symbol>()(symbol) % shards_.size();
 }
 
 void OrderBookManager::Shard::start() {

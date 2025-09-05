@@ -35,7 +35,7 @@ Type toType(std::string_view type) {
     return Type::Invalid;
 }
 
-PriceType toPrice(double price, const PriceSpec& spec) {
+Price toPrice(double price, const PriceSpec& spec) {
   // use long double for fewer rounding surprises in the multiply
   long double scaled = static_cast<long double>(price) * spec.scale;
   // Round to nearest scale unit
@@ -43,7 +43,7 @@ PriceType toPrice(double price, const PriceSpec& spec) {
   // Must be on a tick grid
   if (scaled_i % spec.tick_scaled != 0) throw std::invalid_argument("Price is not on a tick grid");
   // store in *ticks*
-  return PriceType{ scaled_i / spec.tick_scaled };
+  return Price{ scaled_i / spec.tick_scaled };
 }
 
 } // namespace Exchange 

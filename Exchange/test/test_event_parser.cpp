@@ -28,7 +28,7 @@ TEST_F(EventParserTest, ParseNewOrder_ValidMarketOrder) {
     EXPECT_EQ(event.symbol(), "AAPL"_sym);
 
     EXPECT_EQ(newOrderEvent.eventType(), EventType::NewOrder);
-    EXPECT_EQ(newOrderEvent.userId_, UserIdType("user123"));
+    EXPECT_EQ(newOrderEvent.userId_, UserId("user123"));
     EXPECT_EQ(newOrderEvent.clientOrderId_, 1001);
     EXPECT_EQ(newOrderEvent.symbol_, "AAPL"_sym);
     EXPECT_EQ(newOrderEvent.quantity_, 100);
@@ -47,7 +47,7 @@ TEST_F(EventParserTest, ParseNewOrder_ValidLimitOrder) {
     EXPECT_EQ(event.symbol(), "MSFT"_sym);
 
     EXPECT_EQ(newOrderEvent.eventType(), EventType::NewOrder);
-    EXPECT_EQ(newOrderEvent.userId_, UserIdType("user456"));
+    EXPECT_EQ(newOrderEvent.userId_, UserId("user456"));
     EXPECT_EQ(newOrderEvent.clientOrderId_, 1002);
     EXPECT_EQ(newOrderEvent.symbol_, "MSFT"_sym);
     EXPECT_EQ(newOrderEvent.quantity_, 50);
@@ -66,7 +66,7 @@ TEST_F(EventParserTest, ParseNewOrder_WithWhitespace) {
     
     EXPECT_EQ(newOrderEvent.eventType(), EventType::NewOrder);
     
-    EXPECT_EQ(newOrderEvent.userId_, UserIdType("user789"));
+    EXPECT_EQ(newOrderEvent.userId_, UserId("user789"));
     EXPECT_EQ(newOrderEvent.clientOrderId_, 1003);
     EXPECT_EQ(newOrderEvent.symbol_, "GOOGL"_sym);
     EXPECT_EQ(newOrderEvent.quantity_, 200);
@@ -85,7 +85,7 @@ TEST_F(EventParserTest, ParseNewOrder_CaseInsensitive) {
     NewOrderEvent newOrderEvent = std::get<NewOrderEvent>(event.data_);
     
     EXPECT_EQ(newOrderEvent.eventType(), EventType::NewOrder);
-    EXPECT_EQ(newOrderEvent.userId_, UserIdType("user101"));
+    EXPECT_EQ(newOrderEvent.userId_, UserId("user101"));
     EXPECT_EQ(newOrderEvent.clientOrderId_, 1004);
     EXPECT_EQ(newOrderEvent.symbol_, "TSLA"_sym);
     EXPECT_EQ(newOrderEvent.quantity_, 75);
@@ -104,7 +104,7 @@ TEST_F(EventParserTest, ParseNewOrder_ShortForm) {
     EXPECT_EQ(event.symbol(), "NFLX"_sym);
 
     EXPECT_EQ(newOrderEvent.eventType(), EventType::NewOrder);
-    EXPECT_EQ(newOrderEvent.userId_, UserIdType("user202"));
+    EXPECT_EQ(newOrderEvent.userId_, UserId("user202"));
     EXPECT_EQ(newOrderEvent.clientOrderId_, 1005);
     EXPECT_EQ(newOrderEvent.symbol_, "NFLX"_sym);
     EXPECT_EQ(newOrderEvent.quantity_, 25);
@@ -204,7 +204,7 @@ TEST_F(EventParserTest, ParseCancelOrder_Valid) {
     CancelOrderEvent cancelOrderEvent = std::get<CancelOrderEvent>(event.data_);
     
     EXPECT_EQ(cancelOrderEvent.eventType(), EventType::CancelOrder);
-    EXPECT_EQ(cancelOrderEvent.userId_, UserIdType("user123"));
+    EXPECT_EQ(cancelOrderEvent.userId_, UserId("user123"));
     EXPECT_EQ(cancelOrderEvent.origOrderId_, 2001);
     EXPECT_EQ(cancelOrderEvent.symbol_, "AAPL"_sym);
 }
@@ -218,7 +218,7 @@ TEST_F(EventParserTest, ParseCancelOrder_WithWhitespace) {
     CancelOrderEvent cancelOrderEvent = std::get<CancelOrderEvent>(event.data_);
     
     EXPECT_EQ(cancelOrderEvent.eventType(), EventType::CancelOrder);
-    EXPECT_EQ(cancelOrderEvent.userId_, UserIdType("user456"));
+    EXPECT_EQ(cancelOrderEvent.userId_, UserId("user456"));
     EXPECT_EQ(cancelOrderEvent.origOrderId_, 2002);
     EXPECT_EQ(cancelOrderEvent.symbol_, "MSFT"_sym);
 }
@@ -246,7 +246,7 @@ TEST_F(EventParserTest, ParseTopOfBook_Valid) {
     TopOfBookEvent topOfBookEvent = std::get<TopOfBookEvent>(event.data_);
     
     EXPECT_EQ(topOfBookEvent.eventType(), EventType::TopOfBook);
-    EXPECT_EQ(topOfBookEvent.userId_, UserIdType("user123"));
+    EXPECT_EQ(topOfBookEvent.userId_, UserId("user123"));
     EXPECT_EQ(topOfBookEvent.symbol_, "AAPL"_sym);
 }
 
@@ -259,7 +259,7 @@ TEST_F(EventParserTest, ParseTopOfBook_WithWhitespace) {
     TopOfBookEvent topOfBookEvent = std::get<TopOfBookEvent>(event.data_);
     
     EXPECT_EQ(topOfBookEvent.eventType(), EventType::TopOfBook);
-    EXPECT_EQ(topOfBookEvent.userId_, UserIdType("user456"));
+    EXPECT_EQ(topOfBookEvent.userId_, UserId("user456"));
     EXPECT_EQ(topOfBookEvent.symbol_, "MSFT"_sym);
 }
 
@@ -310,7 +310,7 @@ TEST_F(EventParserTest, CreateNewOrderEvent_VariousRanges) {
     auto verify = [](const auto& event) {
       EXPECT_EQ(event.symbol(), "MSFT"_sym);
       NewOrderEvent newOrderEvent = std::get<NewOrderEvent>(event.data_);
-      EXPECT_EQ(newOrderEvent.userId_, UserIdType("user456"));  
+      EXPECT_EQ(newOrderEvent.userId_, UserId("user456"));  
       EXPECT_EQ(newOrderEvent.clientOrderId_, 1002);
       EXPECT_EQ(newOrderEvent.symbol_, "MSFT"_sym);
       EXPECT_EQ(newOrderEvent.quantity_, 50);
@@ -343,7 +343,7 @@ TEST_F(EventParserTest, CreateCancelOrderEvent_VariousRanges) {
     auto verify = [](const auto& event) {
       EXPECT_EQ(event.symbol(), "AAPL"_sym);
       CancelOrderEvent cancelOrderEvent = std::get<CancelOrderEvent>(event.data_);
-      EXPECT_EQ(cancelOrderEvent.userId_, UserIdType("user123"));
+      EXPECT_EQ(cancelOrderEvent.userId_, UserId("user123"));
       EXPECT_EQ(cancelOrderEvent.clientOrderId_, 1001);
       EXPECT_EQ(cancelOrderEvent.symbol_, "AAPL"_sym);
       EXPECT_EQ(cancelOrderEvent.origOrderId_, 2001);
@@ -374,7 +374,7 @@ TEST_F(EventParserTest, CreateTopOfBookEvent_VariousRanges) {
   auto verify = [](const auto& event) {
     EXPECT_EQ(event.symbol(), "MSFT"_sym);
     TopOfBookEvent topOfBookEvent = std::get<TopOfBookEvent>(event.data_);
-    EXPECT_EQ(topOfBookEvent.userId_, UserIdType("user456"));
+    EXPECT_EQ(topOfBookEvent.userId_, UserId("user456"));
     EXPECT_EQ(topOfBookEvent.clientOrderId_, 1002);
     EXPECT_EQ(topOfBookEvent.symbol_, "MSFT"_sym );
   };

@@ -25,7 +25,7 @@ namespace Exchange {
 
 class OrderBookManager : public IOrderBookManager {
 public:
-    using OrderBookMap = std::unordered_map<SymbolType, std::unique_ptr<IOrderBook>>;
+    using OrderBookMap = std::unordered_map<Symbol, std::unique_ptr<IOrderBook>>;
 
     // TODO: change this to one OrderBook and we'll call clone() on it
     OrderBookManager(OrderBookMap && map, int numShards = std::thread::hardware_concurrency() / 2);
@@ -65,7 +65,7 @@ private:
       std::jthread thread_;
     };
 
-    size_t shardIdx(SymbolType symbol) const;
+    size_t shardIdx(Symbol symbol) const;
 
     std::atomic<bool> stopRequested_ {false};
     std::vector<std::unique_ptr<Shard>> shards_;

@@ -17,10 +17,10 @@ enum class OrderState {
 
 class Order {
   public:
-    explicit Order (const NewOrderEvent& event) noexcept;
+    Order (const NewOrderEvent& event, SequenceNumber sequenceNumber) noexcept;
 
-    // Order(UserIdType userId, OrderIdType clientOrderId, SymbolType symbol, QuantityType quantity, Side side, 
-    //               /*Type type,*/ PriceType price) noexcept; 
+    // Order(UserId userId, OrderId clientOrderId, Symbol symbol, Quantity quantity, Side side, 
+    //               /*Type type,*/ Price price) noexcept; 
 
 
   private:
@@ -28,20 +28,26 @@ class Order {
     OrderState state_ {OrderState::New};
 
 
-    UserIdType userId_ {INVALID_USER_ID};
-    OrderIdType clientOrderId_ {};
-    SymbolType symbol_ {};
+    UserId userId_ {INVALID_USER_ID};
+    OrderId clientOrderId_ {};
+    Symbol symbol_ {};
 
 
-    QuantityType openQuantity_ {INVALID_QUANTITY};
-    QuantityType filledQuantity_ {INVALID_QUANTITY};
-    // QuantityType cancelledQuantity_ {INVALID_QUANTITY};
+    Quantity openQuantity_ {INVALID_QUANTITY};
+    Quantity filledQuantity_ {INVALID_QUANTITY};
+    // Quantity cancelledQuantity_ {INVALID_QUANTITY};
 
 
     Side side_ {Side::Invalid};
 
     Type type_ {Type::Invalid};
-    PriceType price_ {INVALID_PRICE};
+    Price price_ {INVALID_PRICE};
+
+    Timestamp timestamp_ {std::chrono::steady_clock::now()};
+
+    // Used as a tie-breaker for orders with the same price/timestamp
+    // we don't have persistance (yet) so this is good enough for now
+    SequenceNumber sequenceNumber_ {0};
 };
 
 } // namespace Exchange

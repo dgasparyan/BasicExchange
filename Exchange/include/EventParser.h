@@ -53,7 +53,7 @@ public:
       if (++it == last) {
         throw std::runtime_error("Not enough tokens in event: Only parsed up to the Order type: ");
       }
-      auto userId = UserIdType(trimCopy(*it));
+      auto userId = UserId(trimCopy(*it));
       if (++it == last) {
         throw std::runtime_error("Not enough tokens in event: Only parsed up to the UserID: ");
       }
@@ -61,7 +61,7 @@ public:
       if (++it == last) {
         throw std::runtime_error("Not enough tokens in event: Only parsed up to the ClientOrderId: ");
       }
-      auto symbol = SymbolType(trimCopy(*it));
+      auto symbol = Symbol(trimCopy(*it));
       if (++it == last) {
         throw std::runtime_error("Not enough tokens in event: Only parsed up to the Symbol: ");
       }
@@ -80,7 +80,7 @@ public:
       if (type == Type::Invalid) {
         throw std::runtime_error("Invalid type: " + std::string(*it));
       }
-      PriceType price = INVALID_PRICE;
+      Price price = INVALID_PRICE;
       if (type == Type::Limit) {
         if (++it == last) {
           throw std::runtime_error("Not enough tokens in event: Price missing for Limit order: ");
@@ -115,7 +115,7 @@ public:
       if (++it == last) {
         throw std::runtime_error("Not enough tokens in event: Only parsed up to the Order type");
       }
-      auto userId = UserIdType(trimCopy(*it));
+      auto userId = UserId(trimCopy(*it));
       if (++it == last) {
         throw std::runtime_error("Not enough tokens in event: Only parsed up to the UserID");
       }
@@ -123,7 +123,7 @@ public:
       if (++it == last) {
         throw std::runtime_error("Not enough tokens in event: Only parsed up to the ClientOrderId");
       }
-      auto symbol = SymbolType(trimCopy(*it));
+      auto symbol = Symbol(trimCopy(*it));
       if (++it == last) {
         throw std::runtime_error("Not enough tokens in event: Only parsed up to the Symbol");
       }
@@ -154,7 +154,7 @@ public:
       if (++it == last) {
         throw std::runtime_error("Not enough tokens in event: Only parsed up to the Order type");
       }
-      auto userId = UserIdType(trimCopy(*it));
+      auto userId = UserId(trimCopy(*it));
       if (++it == last) {
         throw std::runtime_error("Not enough tokens in event: Only parsed up to the UserID");
       }
@@ -162,7 +162,7 @@ public:
       if (++it == last) {
         throw std::runtime_error("Not enough tokens in event: Only parsed up to the ClientOrderId");
       }
-      auto symbol = SymbolType(trimCopy(*it));
+      auto symbol = Symbol(trimCopy(*it));
       
       return Event{std::in_place_type<TopOfBookEvent>, userId, clientOrderId, symbol};
     }

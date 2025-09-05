@@ -21,8 +21,14 @@ public:
     void submitTopOfBook(const TopOfBookEvent& event) override;
 
   private:
-    // using Container = boost::multi_index::multi_index_container<
 
+    struct Order {
+      OrderId id;
+      Symbol symbol;
+      Side side;
+      Price price;
+      Quantity quantity;
+    };
 };
 
 } // namespace Exchange

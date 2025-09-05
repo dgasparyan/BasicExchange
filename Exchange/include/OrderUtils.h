@@ -32,9 +32,9 @@ namespace Exchange {
   
 
   // Price is an integer number of *ticks*
-struct PriceType {
+struct Price {
   int64_t ticks{};                         // e.g., $10.53 with tick=$0.01 → 1053 ticks
-  friend constexpr auto operator<=>(const PriceType&, const PriceType&) = default;
+  friend constexpr auto operator<=>(const Price&, const Price&) = default;
   // implicit conversions are risky; keep this a tiny strong type
 };
 
@@ -52,33 +52,34 @@ struct PriceSpec {
 
 inline constexpr PriceSpec TWO_DIGITS_PRICE_SPEC = PriceSpec{100, 1};
   
-constexpr PriceType INVALID_PRICE {PriceType{-1}};
-constexpr PriceType MARKET_PRICE {PriceType{std::numeric_limits<int64_t>::max()}};
+constexpr Price INVALID_PRICE {Price{-1}};
+constexpr Price MARKET_PRICE {Price{std::numeric_limits<int64_t>::max()}};
 
-PriceType toPrice(double price, const PriceSpec& spec);
+Price toPrice(double price, const PriceSpec& spec);
 
 
-  using OrderIdType = int;
-  constexpr OrderIdType INVALID_ORDER_ID = -1;
+  using OrderId = int;
+  constexpr OrderId INVALID_ORDER_ID = -1;
 
-  using QuantityType = int;
-  constexpr QuantityType INVALID_QUANTITY = -1;
+  using Quantity = int;
+  constexpr Quantity INVALID_QUANTITY = -1;
 
-  using UserIdType = FixedString<32>;
-  constexpr UserIdType INVALID_USER_ID {};
-  constexpr UserIdType operator"" _uid(const char* s, std::size_t n) {
-      return UserIdType(std::string_view{s, n}); // no unbounded scan, compile-time length
+  using UserId = FixedString<32>;
+  constexpr UserId INVALID_USER_ID {};
+  constexpr UserId operator"" _uid(const char* s, std::size_t n) {
+      return UserId(std::string_view{s, n}); // no unbounded scan, compile-time length
   }
   
 
-  using SymbolType = FixedString<8>;
-  constexpr SymbolType INVALID_SYMBOL {};
-  constexpr SymbolType operator"" _sym(const char* s, std::size_t n) {
-      return SymbolType(std::string_view{s, n}); // no unbounded scan, compile-time length
+  using Symbol = FixedString<8>;
+  constexpr Symbol INVALID_SYMBOL {};
+  constexpr Symbol operator"" _sym(const char* s, std::size_t n) {
+      return Symbol(std::string_view{s, n}); // no unbounded scan, compile-time length
   }
 
-  using TimestampType = std::chrono::steady_clock::time_point;
+  using Timestamp = std::chrono::steady_clock::time_point;
 
+  using SequenceNumber = uint64_t;
 
 } // namespace Exchange
 #endif

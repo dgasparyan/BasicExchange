@@ -5,18 +5,18 @@
 namespace Exchange {
 
 
-NewOrderEvent::NewOrderEvent(UserIdType userId, OrderIdType clientOrderId, 
-  SymbolType symbol, QuantityType quantity, Side side, Type type, 
-  PriceType price) noexcept
+NewOrderEvent::NewOrderEvent(UserId userId, OrderId clientOrderId, 
+  Symbol symbol, Quantity quantity, Side side, Type type, 
+  Price price) noexcept
   : OrderEvent<NewOrderEvent>(userId, clientOrderId, symbol), quantity_(quantity), side_(side), type_(type), price_(price) {}
 
 
 
-CancelOrderEvent::CancelOrderEvent(UserIdType userId, OrderIdType clientOrderId, SymbolType symbol, OrderIdType origOrderId) noexcept 
+CancelOrderEvent::CancelOrderEvent(UserId userId, OrderId clientOrderId, Symbol symbol, OrderId origOrderId) noexcept 
     :  OrderEvent<CancelOrderEvent>(userId, clientOrderId, symbol), origOrderId_(origOrderId) {}
 
 
-TopOfBookEvent::TopOfBookEvent(UserIdType userId, OrderIdType clientOrderId, SymbolType symbol) noexcept 
+TopOfBookEvent::TopOfBookEvent(UserId userId, OrderId clientOrderId, Symbol symbol) noexcept 
   : OrderEvent<TopOfBookEvent>(userId, clientOrderId, symbol) {}
 
 
