@@ -8,27 +8,33 @@ namespace Exchange {
   namespace {
 
     constexpr unsigned MAX_BATCH_SIZE = 32;
-    constexpr unsigned QUEUE_CAPACITY = 1024;
-
 
     void backoff(unsigned n) {
       if (n < 32) std::this_thread::yield();
       else std::this_thread::sleep_for(std::chrono::microseconds(1));
   }
-  
+
   }
 
 IOrderBookManager::~IOrderBookManager() = default;
 
-OrderBookManager::OrderBookManager(OrderBookManager::OrderBookMap&& map, int numThreads) 
-: orderBooks_(std::move(map)), eventQueue_(QUEUE_CAPACITY) {
-  
-  // at least 2 threads otherwise what's even the point amirite
-  numThreads = std::max(2, numThreads);
-  std::cout << "OrderBookManager::OrderBookManager: numThreads: " << numThreads << std::endl;
-  for (int i = 0; i < numThreads; ++i) {
-    threads_.emplace_back([this]() { processEvents(); });
+OrderBookManager::OrderBookManager(OrderBookManager::OrderBookMap&& map, int numShards) 
+{  
+  // // at least 2 threads otherwise what's even the point amirite
+  numShards = std::max(2, numShards);
+  shards_.reserve(numShards);  
+  for (int i = 0; i < numShards; ++i) {
+    shards_.emplace_back(std::make_unique<Shard>());
   }
+
+  // TOOD: move to ConfigManager and clone the given map
+  for (std::string_view symStr : {"AAPL", "GOOGL", "MSFT", "AMZN", "META", "NVDA"}) {
+    auto symbol = SymbolType{symStr};
+    auto it = map.find(symbol);
+    shards_[shardIdx(symbol)]->orderBooks_[symbol] = (it == map.end() ? std::make_unique<OrderBook>() : std::move(it->second));
+  }
+
+  std::ranges::for_each(shards_, [](auto& shard) { shard->start(); });
 }
 
 OrderBookManager::~OrderBookManager() {
@@ -37,19 +43,56 @@ OrderBookManager::~OrderBookManager() {
 
 void OrderBookManager::stop() {
   if (!stopRequested_.exchange(true)) {
-    semaphore_.release(threads_.size());
-
-    // a.k.a. join
-    threads_.clear();
+    for (auto& shard : shards_) {
+      shard->stop();
+    }
   }
 }
 
-void OrderBookManager::processEvents() {
+
+bool OrderBookManager::submit(Event event) {
+  if (stopRequested_.load()) {
+    return false;
+  }
+
+  auto idx  {shardIdx(event.symbol())};
+  return shards_[idx]->submit(std::move(event));
+}
+
+size_t OrderBookManager::shardIdx(SymbolType symbol) const {
+  return std::hash<SymbolType>()(symbol) % shards_.size();
+}
+
+void OrderBookManager::Shard::start() {
+  thread_ = std::jthread([this]() { processEvents(); });
+}
+
+void OrderBookManager::Shard::stop() {
+  if (!stopRequested_.exchange(true)) {
+    semaphore_.release(1);
+    thread_.join();
+  }
+}
+
+bool OrderBookManager::Shard::submit(Event&& event) {
+  if (stopRequested_.load()) {
+    return false;
+  }
+  // TODO: review this, moving from the event but might still return false
+  if (!eventQueue_.push(std::move(event))) {
+    return false;
+  }
+  semaphore_.release(1);
+  return true;
+}
+
+void OrderBookManager::Shard::processEvents() {
   while (true) {
-    semaphore_.acquire();
+      semaphore_.acquire();
       if (stopRequested_.load()) {
         break;
       }
+
       Event event;
 
       unsigned int spinCount {0};
@@ -61,7 +104,7 @@ void OrderBookManager::processEvents() {
       // opportunistic batching
       unsigned int grabbed {0};
       while (!stopRequested_.load() && grabbed < MAX_BATCH_SIZE && semaphore_.try_acquire()) {
-          if (stopRequested_.load(std::memory_order_relaxed)) {
+          if (stopRequested_.load()) {
             semaphore_.release(); // return the token so a blocked worker can wake
             break;
           }
@@ -69,12 +112,13 @@ void OrderBookManager::processEvents() {
           if (eventQueue_.pop(event)) { processEvent(std::move(event)); ++grabbed; }
           else { semaphore_.release(1); break; } // return token if we lost the race
       }
-      
-      
     }
-  }
 
-void OrderBookManager::processEvent(Event event) {
+    // TODO: decide if want to drain the queue here
+}
+
+void OrderBookManager::Shard::processEvent(Event&& arg) {
+  auto event = std::move(arg.data_);
 
   auto findAndInvoke = [this](auto&& event, auto&& memFunc) {
     auto it = orderBooks_.find(event.symbol());
@@ -102,22 +146,5 @@ void OrderBookManager::processEvent(Event event) {
   }, std::move(event));
 
 }
-
-bool OrderBookManager::submit(Event event) {
-  // return orderBooks_[event->symbol()]->submit(std::move(event));
-  // std::cout << "OrderBookManager::submit" << std::endl;
-  if (stopRequested_.load()) {
-    return false;
-  }
-
-  if (!eventQueue_.push(std::move(event))) {
-    // std::cout << "OrderBookManager::submit: Queue is full" << std::endl;
-    return false;
-  }
-  semaphore_.release(1);
-
-  return true;
-}
-
 
 } // namespace Exchange 

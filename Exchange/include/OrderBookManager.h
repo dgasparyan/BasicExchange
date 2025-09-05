@@ -27,7 +27,8 @@ class OrderBookManager : public IOrderBookManager {
 public:
     using OrderBookMap = std::unordered_map<SymbolType, std::unique_ptr<IOrderBook>>;
 
-    OrderBookManager(OrderBookMap && map, int numThreads = std::thread::hardware_concurrency() / 2);
+    // TODO: change this to one OrderBook and we'll call clone() on it
+    OrderBookManager(OrderBookMap && map, int numShards = std::thread::hardware_concurrency() / 2);
 
     ~OrderBookManager();
 
@@ -35,23 +36,40 @@ public:
 
     void stop();
 
-  private:
-    void processEvents();
+private:
 
-    void processEvent(Event event);
+    struct Shard {
+      static constexpr unsigned QUEUE_CAPACITY = 1024;
+      void start();
+      void stop();
 
-  private:
-    // kust be initialized fully before we access cuz 
-    // going to do it concurrently
-    const OrderBookMap orderBooks_;
 
-    static_assert(std::is_trivially_copyable_v<Event>, "Event must be trivially copyable for lock-free queue");
-    boost::lockfree::queue<Event> eventQueue_;
 
-    std::counting_semaphore<> semaphore_{ 0};
+      bool submit(Event&& event);
+
+      void processEvents();
+      void processEvent(Event&& event);
+
+
+
+      static_assert(std::is_trivially_copyable_v<Event>, "Event must be trivially copyable for lock-free queue");
+      boost::lockfree::queue<Event, boost::lockfree::capacity<QUEUE_CAPACITY>> eventQueue_ {};
+      std::counting_semaphore<> semaphore_{ 0};
+      std::atomic<bool> stopRequested_ {false};
+
+      
+      OrderBookMap orderBooks_; 
+      // kust be initialized fully before we access cuz 
+      // going to do it concurrently
+      // so we can't have any data races
+      std::jthread thread_;
+    };
+
+    size_t shardIdx(SymbolType symbol) const;
+
     std::atomic<bool> stopRequested_ {false};
+    std::vector<std::unique_ptr<Shard>> shards_;
 
-    std::vector<std::jthread> threads_;
 };
 
 } // namespace Exchange

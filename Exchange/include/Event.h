@@ -2,6 +2,7 @@
 #define EVENT_H
 
 #include <variant>
+#include <concepts>
 #include "OrderUtils.h"
 
 namespace Exchange {
@@ -113,7 +114,46 @@ class QuitEvent {
 };
 
 
-using Event = std::variant<std::monostate, NewOrderEvent, CancelOrderEvent, TopOfBookEvent, QuitEvent>;
+using EventVariant = std::variant<std::monostate, NewOrderEvent, CancelOrderEvent, TopOfBookEvent, QuitEvent>;
+
+template <class T>
+concept HasSymbol = requires (const T& event) {
+  { event.symbol() } -> std::convertible_to<SymbolType>;
+};
+
+template <class T>
+concept AllowNoSymbol = 
+    std::is_same_v<std::decay_t<T>, QuitEvent> 
+    || std::is_same_v<std::decay_t<T>, std::monostate>;
+
+struct Event {
+
+  // Convenience: construct the variant arm by type
+  template<class T, class... Args>
+  explicit Event(std::in_place_type_t<T>, Args&&... args)
+    : data_(std::in_place_type<T>, std::forward<Args>(args)...) {}
+  
+  Event() = default;
+
+  SymbolType symbol() const {
+    auto visitor = [](auto&& event) {
+      using T = std::decay_t<decltype(event)>;
+      if constexpr (HasSymbol<T>) {
+        return event.symbol();
+      } else if constexpr (AllowNoSymbol<T>) {
+        return INVALID_SYMBOL;
+      } 
+      else {
+        static_assert(false, "Should either have a symbol or be declared as AllowNoSymbol");
+      }
+    };
+
+    return std::visit(visitor, data_);
+  }
+
+  // SymbolType symbol_ {INVALID_SYMBOL};
+  EventVariant data_ {};
+};
 
 static_assert(std::is_trivially_copyable_v<Event>, "Event must be trivially copyable so we can use boost lockfree queues");
 
