@@ -21,10 +21,7 @@ public:
     void submitTopOfBook(const TopOfBookEvent& event) override;
 
   private:
-
-
-  // TODO: More fine grained locking
-  // std::mutex mutex_;
+    // using Container = boost::multi_index::multi_index_container<
 
 };
 

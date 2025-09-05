@@ -31,11 +31,32 @@ namespace Exchange {
   Type toType(std::string_view type);
   
 
+  // Price is an integer number of *ticks*
+struct PriceType {
+  int64_t ticks{};                         // e.g., $10.53 with tick=$0.01 → 1053 ticks
+  friend constexpr auto operator<=>(const PriceType&, const PriceType&) = default;
+  // implicit conversions are risky; keep this a tiny strong type
+};
+
+// Per-instrument price spec: scale and tick (both in integer "scale units")
+struct PriceSpec {
+  // scale = how many "scale units" per 1.00 of currency (choose so tick_size becomes integer)
+  // examples:
+  //   equities: scale=100  (1 = $0.01)
+  //   fx (pips): scale=10000 (1 = 0.0001)
+  //   crypto: scale=100000000 (1 = 1e-8)
+  // tick_scaled = tick size expressed in scale units
+  int32_t scale;          // >0
+  int32_t tick_scaled;    // >0, divides any valid scaled price exactly
+};
+
+inline constexpr PriceSpec TWO_DIGITS_PRICE_SPEC = PriceSpec{100, 1};
   
-  // TODO: change to a precise, comparatable type 
-  using PriceType = double;
-  constexpr PriceType INVALID_PRICE = -1;
-  constexpr PriceType MARKET_PRICE = std::numeric_limits<PriceType>::max();
+constexpr PriceType INVALID_PRICE {PriceType{-1}};
+constexpr PriceType MARKET_PRICE {PriceType{std::numeric_limits<int64_t>::max()}};
+
+PriceType toPrice(double price, const PriceSpec& spec);
+
 
   using OrderIdType = int;
   constexpr OrderIdType INVALID_ORDER_ID = -1;

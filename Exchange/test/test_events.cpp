@@ -17,7 +17,7 @@ protected:
 
 
 TEST_F(EventTest, NewOrderEvent_Construction) {
-    NewOrderEvent event("user1"_uid, 1001, "AAPL"_sym, 100, Side::Buy, Type::Limit, 150.50);
+    NewOrderEvent event("user1"_uid, 1001, "AAPL"_sym, 100, Side::Buy, Type::Limit, toPrice(150.50, TWO_DIGITS_PRICE_SPEC));
     
     EXPECT_EQ(event.eventType(), EventType::NewOrder);
     EXPECT_EQ(event.userId_, "user1"_uid);
@@ -26,7 +26,7 @@ TEST_F(EventTest, NewOrderEvent_Construction) {
     EXPECT_EQ(event.quantity_, 100);
     EXPECT_EQ(event.side_, Side::Buy);
     EXPECT_EQ(event.type_, Type::Limit);
-    EXPECT_EQ(event.price_, 150.50);
+    EXPECT_EQ(event.price_, toPrice(150.50, TWO_DIGITS_PRICE_SPEC));
 }
 
 TEST_F(EventTest, NewOrderEvent_DefaultPrice) {

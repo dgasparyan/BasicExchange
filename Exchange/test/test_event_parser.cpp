@@ -53,7 +53,7 @@ TEST_F(EventParserTest, ParseNewOrder_ValidLimitOrder) {
     EXPECT_EQ(newOrderEvent.quantity_, 50);
     EXPECT_EQ(newOrderEvent.side_, Side::Sell);
     EXPECT_EQ(newOrderEvent.type_, Type::Limit);
-    EXPECT_DOUBLE_EQ(newOrderEvent.price_, 150.75);
+    EXPECT_EQ(newOrderEvent.price_, toPrice(150.75, TWO_DIGITS_PRICE_SPEC));
 }
 
 TEST_F(EventParserTest, ParseNewOrder_WithWhitespace) {
@@ -91,7 +91,7 @@ TEST_F(EventParserTest, ParseNewOrder_CaseInsensitive) {
     EXPECT_EQ(newOrderEvent.quantity_, 75);
     EXPECT_EQ(newOrderEvent.side_, Side::Sell);
     EXPECT_EQ(newOrderEvent.type_, Type::Limit);
-    EXPECT_DOUBLE_EQ(newOrderEvent.price_, 250.50);
+    EXPECT_EQ(newOrderEvent.price_, toPrice(250.50, TWO_DIGITS_PRICE_SPEC));
 }
 
 TEST_F(EventParserTest, ParseNewOrder_ShortForm) {
@@ -110,7 +110,7 @@ TEST_F(EventParserTest, ParseNewOrder_ShortForm) {
     EXPECT_EQ(newOrderEvent.quantity_, 25);
     EXPECT_EQ(newOrderEvent.side_, Side::Buy);
     EXPECT_EQ(newOrderEvent.type_, Type::Limit);
-    EXPECT_DOUBLE_EQ(newOrderEvent.price_, 180.25);
+    EXPECT_EQ(newOrderEvent.price_, toPrice(180.25, TWO_DIGITS_PRICE_SPEC));
 }
 
 TEST_F(EventParserTest, ParseNewOrder_InvalidSide) {
@@ -184,7 +184,7 @@ TEST_F(EventParserTest, ParseNewOrder_LargeNumbers) {
     EXPECT_EQ(newOrderEvent.eventType(), EventType::NewOrder);
     EXPECT_EQ(newOrderEvent.clientOrderId_, 999999);
     EXPECT_EQ(newOrderEvent.quantity_, 1000000);
-    EXPECT_DOUBLE_EQ(newOrderEvent.price_, 999999.99);
+    EXPECT_EQ(newOrderEvent.price_, toPrice(999999.99, TWO_DIGITS_PRICE_SPEC));
 }
 
 TEST_F(EventParserTest, ParseInvalidEventType) {
@@ -316,7 +316,7 @@ TEST_F(EventParserTest, CreateNewOrderEvent_VariousRanges) {
       EXPECT_EQ(newOrderEvent.quantity_, 50);
       EXPECT_EQ(newOrderEvent.side_, Side::Sell);
       EXPECT_EQ(newOrderEvent.type_, Type::Limit);
-      EXPECT_DOUBLE_EQ(newOrderEvent.price_, 150.75);
+      EXPECT_EQ(newOrderEvent.price_, toPrice(150.75, TWO_DIGITS_PRICE_SPEC));
     };
     
     { // const lvalue

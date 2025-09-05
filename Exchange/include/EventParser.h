@@ -85,7 +85,7 @@ public:
         if (++it == last) {
           throw std::runtime_error("Not enough tokens in event: Price missing for Limit order: ");
         }
-        price = std::stod(trimCopy(*it));
+        price = toPrice(std::stod(trimCopy(*it)), TWO_DIGITS_PRICE_SPEC);
       }
 
       return Event{std::in_place_type<NewOrderEvent>, userId, clientOrderId, symbol, quantity, side, type, price};
