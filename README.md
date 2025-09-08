@@ -1,3 +1,5 @@
+NOTE: Still Work In Progress.
+
 Going to build a simple "Exchange". 
 
 We'll process incoming orders from a UDP PORT ($PORT) in the following format:

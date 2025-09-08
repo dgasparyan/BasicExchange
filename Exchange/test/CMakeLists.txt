@@ -20,6 +20,7 @@ set(TEST_SOURCES
     test_order_utils.cpp
     test_event_parser.cpp
     test_events.cpp
+    test_orderbook.cpp
 )
 
 # Create test executable
@@ -29,6 +30,7 @@ add_executable(run_tests ${TEST_SOURCES})
 target_link_libraries(run_tests 
     GTest::gtest 
     GTest::gtest_main
+    GTest::gmock
     Boost::boost
 )
 
@@ -38,6 +40,9 @@ target_sources(run_tests PRIVATE
     ../src/OrderUtils.cpp
     ../src/EventParser.cpp
     ../src/Event.cpp
+    ../src/OrderBook.cpp
+    ../src/Order.cpp
+    ../src/ReportSink.cpp
 )
 
 # Enable testing

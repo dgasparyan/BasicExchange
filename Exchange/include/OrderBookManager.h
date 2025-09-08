@@ -12,6 +12,7 @@
 #include "OrderBook.h"
 #include "Event.h"
 #include "OrderUtils.h"
+#include "ReportSink.h"
 
 namespace Exchange {
 
@@ -57,7 +58,7 @@ private:
       std::counting_semaphore<> semaphore_{ 0};
       std::atomic<bool> stopRequested_ {false};
 
-      
+      ReportSink reportSink_;
       OrderBookMap orderBooks_; 
       // kust be initialized fully before we access cuz 
       // going to do it concurrently

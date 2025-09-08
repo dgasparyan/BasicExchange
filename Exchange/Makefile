@@ -22,7 +22,7 @@ BOOST_LIBS =
 GTEST_DIR ?= /opt/homebrew
 GTEST_INCLUDE_DIR = $(GTEST_DIR)/include
 GTEST_LIB_DIR = $(GTEST_DIR)/lib
-GTEST_LIBS = -lgtest -lgtest_main -lpthread
+GTEST_LIBS = -lgtest -lgtest_main -lgmock -lpthread
 
 # Linker flags
 LDFLAGS = -L$(BOOST_LIB_DIR) $(BOOST_LIBS)
