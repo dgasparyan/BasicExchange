@@ -59,9 +59,11 @@ int main(int argc, char* argv[]) {
       Exchange::CsvEventParser eventParser;
       Exchange::UDPListener listener(port);
 
+      // TODO: this whole creation needs to be fixed, should be using one report sink per book to reduce contention
+      Exchange::ReportSink reportSink;
       Exchange::OrderBookManager::OrderBookMap orderBookMap;
       for (std::string_view symbol : {"AAPL", "GOOGL", "MSFT", "AMZN", "META", "NVDA"}) {
-        orderBookMap.emplace(symbol, std::make_unique<Exchange::OrderBook>());
+        orderBookMap.emplace(symbol, std::make_unique<Exchange::OrderBook<Exchange::ReportSink>>(reportSink));
       }
       // const auto numThreads = std  ::max(static_cast<int>(std::thread::hardware_concurrency() / 2), 2);
       const auto numThreads = 3;

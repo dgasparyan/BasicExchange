@@ -31,7 +31,8 @@ OrderBookManager::OrderBookManager(OrderBookManager::OrderBookMap&& map, int num
   for (std::string_view symStr : {"AAPL", "GOOGL", "MSFT", "AMZN", "META", "NVDA"}) {
     auto symbol = Symbol{symStr};
     auto it = map.find(symbol);
-    shards_[shardIdx(symbol)]->orderBooks_[symbol] = (it == map.end() ? std::make_unique<OrderBook>() : std::move(it->second));
+    auto& shard = shards_[shardIdx(symbol)];
+    shard->orderBooks_[symbol] = (it == map.end() ? std::make_unique<OrderBook<ReportSink>>(shard->reportSink_) : std::move(it->second));
   }
 
   std::ranges::for_each(shards_, [](auto& shard) { shard->start(); });

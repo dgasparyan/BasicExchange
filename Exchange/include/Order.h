@@ -18,9 +18,25 @@ enum class OrderState {
 class Order {
   public:
     Order (const NewOrderEvent& event, SequenceNumber sequenceNumber) noexcept;
+    Order (const NewOrderEvent& event, SequenceNumber sequenceNumber, Quantity filledQuantity) noexcept;
+    OrderState state() const { return state_; }
+    bool isActive() const;
 
-    // Order(UserId userId, OrderId clientOrderId, Symbol symbol, Quantity quantity, Side side, 
-    //               /*Type type,*/ Price price) noexcept; 
+
+    UserId userId() const { return userId_; }
+    OrderId clientOrderId() const { return clientOrderId_; }
+    Symbol symbol() const { return symbol_; }
+    Side side() const { return side_; }
+    Type type() const { return type_; }
+    Price price() const { return price_; }
+    Timestamp timestamp() const { return timestamp_; }
+    SequenceNumber sequenceNumber() const { return sequenceNumber_; }
+
+    Quantity quantity() const { return quantity_; }
+    Quantity openQuantity() const { return openQuantity_; }
+    Quantity filledQuantity() const { return quantity() - openQuantity(); }
+
+    Quantity fill(Quantity quantity);
 
 
   private:
@@ -33,8 +49,8 @@ class Order {
     Symbol symbol_ {};
 
 
+    Quantity quantity_ {INVALID_QUANTITY};
     Quantity openQuantity_ {INVALID_QUANTITY};
-    Quantity filledQuantity_ {INVALID_QUANTITY};
     // Quantity cancelledQuantity_ {INVALID_QUANTITY};
 
 

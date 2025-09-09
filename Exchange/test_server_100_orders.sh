@@ -9,8 +9,8 @@ HOST=${2:-127.0.0.1}
 echo "Testing UDP Exchange Server on $HOST:$PORT with 100 orders"
 echo "========================================================="
 
-# Array of common stock symbols
-SYMBOLS=("AAPL" "MSFT" "GOOGL" "AMZN" "TSLA" "META" "NVDA" "NFLX" "AMD" "INTC" "ORCL" "CRM" "ADBE" "PYPL" "UBER" "LYFT" "SPOT" "TWTR" "SNAP" "ZM")
+# Array of supported stock symbols (matching OrderBookManager)
+SYMBOLS=("AAPL" "GOOGL" "MSFT" "AMZN" "META" "NVDA")
 
 # Array of user IDs
 USERS=("user001" "user002" "user003" "user004" "user005" "user006" "user007" "user008" "user009" "user010")
@@ -84,14 +84,14 @@ done
 
 # Test some edge cases
 echo "Testing edge cases..."
-echo "D,user999,9999,TSLA,1,BUY,LIMIT,999.99" | nc -u -w0 $HOST $PORT
+echo "D,user999,9999,NVDA,1,BUY,LIMIT,999.99" | nc -u -w0 $HOST $PORT
 echo "D,user888,8888,MSFT,999999,SELL,MARKET" | nc -u -w0 $HOST $PORT
 echo "D,user777,7777,AAPL,0,BUY,LIMIT,0.01" | nc -u -w0 $HOST $PORT
 
 # Test case variations
 echo "Testing case variations..."
-echo "d,user101,1001,TSLA,75,sell,limit,250.50" | nc -u -w0 $HOST $PORT
-echo "f,user202,1002,NFLX,2005" | nc -u -w0 $HOST $PORT
+echo "d,user101,1001,META,75,sell,limit,250.50" | nc -u -w0 $HOST $PORT
+echo "f,user202,1002,AMZN,2005" | nc -u -w0 $HOST $PORT
 echo "v,user303,1003,GOOGL" | nc -u -w0 $HOST $PORT
 
 # Test whitespace handling
