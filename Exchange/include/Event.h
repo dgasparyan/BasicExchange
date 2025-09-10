@@ -91,6 +91,10 @@ class CancelOrderEvent : public OrderEvent<CancelOrderEvent> {
       return EventType::CancelOrder;
     }
 
+    OrderId origOrderId() const {
+      return origOrderId_;
+    }
+
   public:
     OrderId origOrderId_ {};
 };

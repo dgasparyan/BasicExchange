@@ -13,6 +13,8 @@ public:
 
     bool submitCanceledOrder(CanceledOrderReport&& report);
 
+    bool submitTopOfBook(TopOfBookReport&& report);
+
 };
 
 } // namespace Exchange

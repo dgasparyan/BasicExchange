@@ -13,4 +13,9 @@ bool ReportSink::submitCanceledOrder(CanceledOrderReport&& report) {
   return true;
 }
 
+bool ReportSink::submitTopOfBook(TopOfBookReport&& report) {
+  std::cout << "ReportSink::submitTopOfBook: " << report.bid_order.clientOrderId() << " " << report.ask_order.clientOrderId() << std::endl;
+  return true;
+}
+
 } // namespace Exchange

@@ -21,6 +21,10 @@ Order::Order(const NewOrderEvent& event, SequenceNumber sequenceNumber, Quantity
   state_ = openQuantity_ == 0 ? OrderState::Filled : OrderState::PartiallyFilled;
 }
 
+bool Order::isValid() const {
+  return clientOrderId_ != INVALID_ORDER_ID;
+}
+
 bool Order::isActive() const {
   return state_ == OrderState::New || state_ == OrderState::PartiallyFilled;
 }
@@ -31,6 +35,10 @@ Quantity Order::fill(Quantity qty) {
   openQuantity_ -= d;
   state_ = (openQuantity_ == 0) ? OrderState::Filled : OrderState::PartiallyFilled;
   return d;
+}
+
+void Order::cancel() {
+  state_ = OrderState::Cancelled;
 }
 
 } // namespace Exchange

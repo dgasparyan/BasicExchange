@@ -13,6 +13,7 @@ class MockReportSink {
 public:
     MOCK_METHOD1(submitFills, bool(std::vector<std::pair<OrderId, Quantity>>&& fills));
     MOCK_METHOD1(submitCanceledOrder, bool(CanceledOrderReport&& report));
+    MOCK_METHOD1(submitTopOfBook, bool(TopOfBookReport&& report));
 };
 
 class OrderBookTest : public ::testing::Test {
@@ -46,9 +47,44 @@ TEST_F(OrderBookTest, SubmitNewOrder_BuyLimitOrder_AddsToBidBook) {
     // Act
     orderBook_->submitNewOrder(event);
 
-    // Assert - No fills should be reported for a passive limit order
-    // The order should be added to the bid book (we can't directly verify this without
-    // exposing internal state, but we can verify no fills were reported)
+    // Test top of book - should show the buy order as best bid
+    auto topOfBookEvent = TopOfBookEvent("user123"_uid, 1001, "AAPL"_sym);
+    
+    TopOfBookReport capturedTopOfBook;
+    EXPECT_CALL(*mockReportSink_, submitTopOfBook(testing::_))
+        .WillOnce(testing::Invoke([&capturedTopOfBook](TopOfBookReport&& report) {
+            capturedTopOfBook = std::move(report);
+            return true;
+        }));
+
+    orderBook_->submitTopOfBook(topOfBookEvent);
+
+    // Assert - Verify top of book shows correct bid order
+    EXPECT_EQ(capturedTopOfBook.bid_order.clientOrderId(), 1001);
+    EXPECT_EQ(capturedTopOfBook.bid_order.quantity(), 100);
+    EXPECT_EQ(capturedTopOfBook.bid_order.openQuantity(), 100);  // No fills yet
+    EXPECT_EQ(capturedTopOfBook.bid_order.price(), toPrice(150.00, TWO_DIGITS_PRICE_SPEC));
+    EXPECT_EQ(capturedTopOfBook.bid_order.side(), Side::Buy);
+    // Ask should be empty (default Order)
+    EXPECT_FALSE(capturedTopOfBook.ask_order.isValid());
+
+    // Now cancel the order and verify the cancellation report
+    auto cancelEvent = CancelOrderEvent("user123"_uid, 1001, "AAPL"_sym, 1001);
+    
+    CanceledOrderReport capturedCancel;
+    EXPECT_CALL(*mockReportSink_, submitCanceledOrder(testing::_))
+        .WillOnce(testing::Invoke([&capturedCancel](CanceledOrderReport&& report) {
+            capturedCancel = std::move(report);
+            return true;
+        }));
+
+    bool cancelResult = orderBook_->submitCancelOrder(cancelEvent);
+
+    // Assert - Verify cancellation was successful and reported correctly
+    EXPECT_TRUE(cancelResult);
+    EXPECT_EQ(capturedCancel.orderId, 1001);
+    EXPECT_EQ(capturedCancel.remainingQuantity, 100);  // Full quantity cancelled
+    EXPECT_EQ(capturedCancel.reason, CancelReason::User_Canceled);
 }
 
 TEST_F(OrderBookTest, SubmitNewOrder_SellLimitOrder_AddsToAskBook) {
@@ -66,7 +102,44 @@ TEST_F(OrderBookTest, SubmitNewOrder_SellLimitOrder_AddsToAskBook) {
     // Act
     orderBook_->submitNewOrder(event);
 
-    // Assert - No fills should be reported for a passive limit order
+    // Test top of book - should show the sell order as best ask
+    auto topOfBookEvent = TopOfBookEvent("user456"_uid, 1002, "AAPL"_sym);
+    
+    TopOfBookReport capturedTopOfBook;
+    EXPECT_CALL(*mockReportSink_, submitTopOfBook(testing::_))
+        .WillOnce(testing::Invoke([&capturedTopOfBook](TopOfBookReport&& report) {
+            capturedTopOfBook = std::move(report);
+            return true;
+        }));
+
+    orderBook_->submitTopOfBook(topOfBookEvent);
+
+    // Assert - Verify top of book shows correct ask order
+    EXPECT_EQ(capturedTopOfBook.ask_order.clientOrderId(), 1002);
+    EXPECT_EQ(capturedTopOfBook.ask_order.quantity(), 50);
+    EXPECT_EQ(capturedTopOfBook.ask_order.openQuantity(), 50);  // No fills yet
+    EXPECT_EQ(capturedTopOfBook.ask_order.price(), toPrice(151.00, TWO_DIGITS_PRICE_SPEC));
+    EXPECT_EQ(capturedTopOfBook.ask_order.side(), Side::Sell);
+    // Bid should be empty (default Order)
+    EXPECT_FALSE(capturedTopOfBook.bid_order.isValid());
+
+    // Now cancel the order and verify the cancellation report
+    auto cancelEvent = CancelOrderEvent("user456"_uid, 1002, "AAPL"_sym, 1002);
+    
+    CanceledOrderReport capturedCancel;
+    EXPECT_CALL(*mockReportSink_, submitCanceledOrder(testing::_))
+        .WillOnce(testing::Invoke([&capturedCancel](CanceledOrderReport&& report) {
+            capturedCancel = std::move(report);
+            return true;
+        }));
+
+    bool cancelResult = orderBook_->submitCancelOrder(cancelEvent);
+
+    // Assert - Verify cancellation was successful and reported correctly
+    EXPECT_TRUE(cancelResult);
+    EXPECT_EQ(capturedCancel.orderId, 1002);
+    EXPECT_EQ(capturedCancel.remainingQuantity, 50);  // Full quantity cancelled
+    EXPECT_EQ(capturedCancel.reason, CancelReason::User_Canceled);
 }
 
 TEST_F(OrderBookTest, SubmitNewOrder_BuyMarketOrder_WithNoSells_CancelsOrder) {
@@ -96,6 +169,8 @@ TEST_F(OrderBookTest, SubmitNewOrder_BuyMarketOrder_WithNoSells_CancelsOrder) {
     EXPECT_EQ(capturedCancel.orderId, 1003);                    // Correct order ID
     EXPECT_EQ(capturedCancel.remainingQuantity, 100);           // Full quantity cancelled (no fills)
     EXPECT_EQ(capturedCancel.reason, CancelReason::Fill_And_Kill); // Correct reason
+
+    
 }
 
 TEST_F(OrderBookTest, SubmitNewOrder_AggressiveBuy_FillsWithExistingSell) {
@@ -111,6 +186,27 @@ TEST_F(OrderBookTest, SubmitNewOrder_AggressiveBuy_FillsWithExistingSell) {
         toPrice(150.00, TWO_DIGITS_PRICE_SPEC)
     );
     orderBook_->submitNewOrder(sellEvent);
+
+    // Test top of book before aggressive order - should show only the sell order
+    auto topOfBookEvent1 = TopOfBookEvent("user456"_uid, 2001, "AAPL"_sym);
+    
+    TopOfBookReport capturedTopOfBook1;
+    EXPECT_CALL(*mockReportSink_, submitTopOfBook(testing::_))
+        .WillOnce(testing::Invoke([&capturedTopOfBook1](TopOfBookReport&& report) {
+            capturedTopOfBook1 = std::move(report);
+            return true;
+        }));
+
+    orderBook_->submitTopOfBook(topOfBookEvent1);
+
+    // Assert - Verify top of book shows only ask order before aggressive order
+    EXPECT_EQ(capturedTopOfBook1.ask_order.clientOrderId(), 2001);
+    EXPECT_EQ(capturedTopOfBook1.ask_order.quantity(), 100);
+    EXPECT_EQ(capturedTopOfBook1.ask_order.openQuantity(), 100);  // No fills yet
+    EXPECT_EQ(capturedTopOfBook1.ask_order.price(), toPrice(150.00, TWO_DIGITS_PRICE_SPEC));
+    EXPECT_EQ(capturedTopOfBook1.ask_order.side(), Side::Sell);
+    // Bid should be empty (default Order)
+    EXPECT_FALSE(capturedTopOfBook1.bid_order.isValid());
 
     // Now add an aggressive buy order
     auto buyEvent = NewOrderEvent(
@@ -140,6 +236,45 @@ TEST_F(OrderBookTest, SubmitNewOrder_AggressiveBuy_FillsWithExistingSell) {
     EXPECT_EQ(capturedFills[0].second, 50);    // 50 shares filled
     EXPECT_EQ(capturedFills[1].first, 2002);   // Buy order ID  
     EXPECT_EQ(capturedFills[1].second, 50);    // 50 shares filled
+
+    // Test top of book after partial fill - should show remaining sell order
+    auto topOfBookEvent2 = TopOfBookEvent("user456"_uid, 2001, "AAPL"_sym);
+    
+    TopOfBookReport capturedTopOfBook2;
+    EXPECT_CALL(*mockReportSink_, submitTopOfBook(testing::_))
+        .WillOnce(testing::Invoke([&capturedTopOfBook2](TopOfBookReport&& report) {
+            capturedTopOfBook2 = std::move(report);
+            return true;
+        }));
+
+    orderBook_->submitTopOfBook(topOfBookEvent2);
+
+    // Assert - Verify top of book shows remaining ask order after partial fill
+    EXPECT_EQ(capturedTopOfBook2.ask_order.clientOrderId(), 2001);
+    EXPECT_EQ(capturedTopOfBook2.ask_order.quantity(), 100);  // Order still shows original quantity (100)
+    EXPECT_EQ(capturedTopOfBook2.ask_order.openQuantity(), 50);  // 50 shares remaining after 50 filled
+    EXPECT_EQ(capturedTopOfBook2.ask_order.price(), toPrice(150.00, TWO_DIGITS_PRICE_SPEC));
+    EXPECT_EQ(capturedTopOfBook2.ask_order.side(), Side::Sell);
+    // Bid should still be empty (default Order)
+    EXPECT_FALSE(capturedTopOfBook2.bid_order.isValid());
+
+    // Now cancel the remaining 50 shares of the sell order
+    auto cancelEvent = CancelOrderEvent("user456"_uid, 2001, "AAPL"_sym, 2001);
+    
+    CanceledOrderReport capturedCancel;
+    EXPECT_CALL(*mockReportSink_, submitCanceledOrder(testing::_))
+        .WillOnce(testing::Invoke([&capturedCancel](CanceledOrderReport&& report) {
+            capturedCancel = std::move(report);
+            return true;
+        }));
+
+    bool cancelResult = orderBook_->submitCancelOrder(cancelEvent);
+
+    // Assert - Verify cancellation was successful and reported correct remaining quantity
+    EXPECT_TRUE(cancelResult);
+    EXPECT_EQ(capturedCancel.orderId, 2001);
+    EXPECT_EQ(capturedCancel.remainingQuantity, 50);  // 50 shares remaining (100 - 50 filled)
+    EXPECT_EQ(capturedCancel.reason, CancelReason::User_Canceled);
 }
 
 TEST_F(OrderBookTest, SubmitNewOrder_AggressiveSell_FillsWithExistingBuy) {
@@ -184,12 +319,30 @@ TEST_F(OrderBookTest, SubmitNewOrder_AggressiveSell_FillsWithExistingBuy) {
     EXPECT_EQ(capturedFills[0].second, 75);    // 75 shares filled
     EXPECT_EQ(capturedFills[1].first, 3002);   // Sell order ID  
     EXPECT_EQ(capturedFills[1].second, 75);    // 75 shares filled
+
+    // Now cancel the remaining 25 shares of the buy order
+    auto cancelEvent = CancelOrderEvent("user123"_uid, 3001, "AAPL"_sym, 3001);
+    
+    CanceledOrderReport capturedCancel;
+    EXPECT_CALL(*mockReportSink_, submitCanceledOrder(testing::_))
+        .WillOnce(testing::Invoke([&capturedCancel](CanceledOrderReport&& report) {
+            capturedCancel = std::move(report);
+            return true;
+        }));
+
+    bool cancelResult = orderBook_->submitCancelOrder(cancelEvent);
+
+    // Assert - Verify cancellation was successful and reported correct remaining quantity
+    EXPECT_TRUE(cancelResult);
+    EXPECT_EQ(capturedCancel.orderId, 3001);
+    EXPECT_EQ(capturedCancel.remainingQuantity, 25);  // 25 shares remaining (100 - 75 filled)
+    EXPECT_EQ(capturedCancel.reason, CancelReason::User_Canceled);
 }
 
 TEST_F(OrderBookTest, SubmitNewOrder_PartialFill_RemainingGoesToBook) {
     // Arrange
-    // First add a sell order for 100 shares
-    auto sellEvent = NewOrderEvent(
+    // First add a sell order for 100 shares at $150.00
+    auto sellEvent1 = NewOrderEvent(
         "user456"_uid, 
         4001, 
         "AAPL"_sym, 
@@ -198,9 +351,21 @@ TEST_F(OrderBookTest, SubmitNewOrder_PartialFill_RemainingGoesToBook) {
         Type::Limit, 
         toPrice(150.00, TWO_DIGITS_PRICE_SPEC)
     );
-    orderBook_->submitNewOrder(sellEvent);
+    orderBook_->submitNewOrder(sellEvent1);
 
-    // Now add a buy order for 150 shares (more than available)
+    // Add another sell order for 200 shares at $152.00 (worse price)
+    auto sellEvent2 = NewOrderEvent(
+        "user789"_uid, 
+        4003, 
+        "AAPL"_sym, 
+        200, 
+        Side::Sell, 
+        Type::Limit, 
+        toPrice(152.00, TWO_DIGITS_PRICE_SPEC)
+    );
+    orderBook_->submitNewOrder(sellEvent2);
+
+    // Now add a buy order for 150 shares (will fill 100 from first sell, 50 remaining goes to book)
     auto buyEvent = NewOrderEvent(
         "user123"_uid, 
         4002, 
@@ -229,7 +394,23 @@ TEST_F(OrderBookTest, SubmitNewOrder_PartialFill_RemainingGoesToBook) {
     EXPECT_EQ(capturedFills[1].first, 4002);   // Buy order ID  
     EXPECT_EQ(capturedFills[1].second, 100);   // 100 shares filled (partial fill of 150)
 
-    // The remaining 50 shares of the buy order should be added to the bid book
+    // Now cancel the remaining 50 shares of the buy order
+    auto cancelEvent = CancelOrderEvent("user123"_uid, 4002, "AAPL"_sym, 4002);
+    
+    CanceledOrderReport capturedCancel;
+    EXPECT_CALL(*mockReportSink_, submitCanceledOrder(testing::_))
+        .WillOnce(testing::Invoke([&capturedCancel](CanceledOrderReport&& report) {
+            capturedCancel = std::move(report);
+            return true;
+        }));
+
+    bool cancelResult = orderBook_->submitCancelOrder(cancelEvent);
+
+    // Assert - Verify cancellation was successful and reported correct remaining quantity
+    EXPECT_TRUE(cancelResult);
+    EXPECT_EQ(capturedCancel.orderId, 4002);
+    EXPECT_EQ(capturedCancel.remainingQuantity, 50);  // 50 shares remaining (150 - 100 filled)
+    EXPECT_EQ(capturedCancel.reason, CancelReason::User_Canceled);
 }
 
 TEST_F(OrderBookTest, SubmitNewOrder_PartialFill_ThenCancelled) {
@@ -759,6 +940,92 @@ TEST_F(OrderBookTest, SubmitNewOrder_NegativeQuantity_DoesNotCrash) {
 
     // Act & Assert - Should not crash
     EXPECT_NO_THROW(orderBook_->submitNewOrder(event));
+}
+
+TEST_F(OrderBookTest, SubmitCancelOrder_NonExistentOrder_ReturnsFalse) {
+    // Arrange - Try to cancel an order that doesn't exist
+    auto cancelEvent = CancelOrderEvent("user123"_uid, 9999, "AAPL"_sym, 9999);
+
+    // Expect no cancellation report since order doesn't exist
+    EXPECT_CALL(*mockReportSink_, submitCanceledOrder(testing::_))
+        .Times(0);
+
+    // Act
+    bool cancelResult = orderBook_->submitCancelOrder(cancelEvent);
+
+    // Assert - Should return false for non-existent order
+    EXPECT_FALSE(cancelResult);
+}
+
+TEST_F(OrderBookTest, SubmitTopOfBook_WithBothBidAndAsk_ShowsCorrectOrders) {
+    // Arrange - Add both buy and sell orders
+    auto buyEvent = NewOrderEvent(
+        "user123"_uid, 
+        9001, 
+        "AAPL"_sym, 
+        100, 
+        Side::Buy, 
+        Type::Limit, 
+        toPrice(150.00, TWO_DIGITS_PRICE_SPEC)
+    );
+    orderBook_->submitNewOrder(buyEvent);
+
+    auto sellEvent = NewOrderEvent(
+        "user456"_uid, 
+        9002, 
+        "AAPL"_sym, 
+        75, 
+        Side::Sell, 
+        Type::Limit, 
+        toPrice(151.00, TWO_DIGITS_PRICE_SPEC)
+    );
+    orderBook_->submitNewOrder(sellEvent);
+
+    // Act - Request top of book
+    auto topOfBookEvent = TopOfBookEvent("user789"_uid, 9003, "AAPL"_sym);
+    
+    TopOfBookReport capturedTopOfBook;
+    EXPECT_CALL(*mockReportSink_, submitTopOfBook(testing::_))
+        .WillOnce(testing::Invoke([&capturedTopOfBook](TopOfBookReport&& report) {
+            capturedTopOfBook = std::move(report);
+            return true;
+        }));
+
+    orderBook_->submitTopOfBook(topOfBookEvent);
+
+    // Assert - Verify top of book shows both best bid and best ask
+    // Best bid (highest buy price)
+    EXPECT_EQ(capturedTopOfBook.bid_order.clientOrderId(), 9001);
+    EXPECT_EQ(capturedTopOfBook.bid_order.quantity(), 100);
+    EXPECT_EQ(capturedTopOfBook.bid_order.openQuantity(), 100);  // No fills yet
+    EXPECT_EQ(capturedTopOfBook.bid_order.price(), toPrice(150.00, TWO_DIGITS_PRICE_SPEC));
+    EXPECT_EQ(capturedTopOfBook.bid_order.side(), Side::Buy);
+    
+    // Best ask (lowest sell price)
+    EXPECT_EQ(capturedTopOfBook.ask_order.clientOrderId(), 9002);
+    EXPECT_EQ(capturedTopOfBook.ask_order.quantity(), 75);
+    EXPECT_EQ(capturedTopOfBook.ask_order.openQuantity(), 75);  // No fills yet
+    EXPECT_EQ(capturedTopOfBook.ask_order.price(), toPrice(151.00, TWO_DIGITS_PRICE_SPEC));
+    EXPECT_EQ(capturedTopOfBook.ask_order.side(), Side::Sell);
+}
+
+TEST_F(OrderBookTest, SubmitTopOfBook_EmptyBook_ReturnsInvalidOrders) {
+    // Arrange - Empty order book (no orders placed)
+    auto topOfBookEvent = TopOfBookEvent("user123"_uid, 9999, "AAPL"_sym);
+    
+    TopOfBookReport capturedTopOfBook;
+    EXPECT_CALL(*mockReportSink_, submitTopOfBook(testing::_))
+        .WillOnce(testing::Invoke([&capturedTopOfBook](TopOfBookReport&& report) {
+            capturedTopOfBook = std::move(report);
+            return true;
+        }));
+
+    // Act
+    orderBook_->submitTopOfBook(topOfBookEvent);
+
+    // Assert - Verify both bid and ask orders are invalid (default Order objects)
+    EXPECT_FALSE(capturedTopOfBook.bid_order.isValid());
+    EXPECT_FALSE(capturedTopOfBook.ask_order.isValid());
 }
 
 } // namespace test

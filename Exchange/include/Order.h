@@ -17,10 +17,14 @@ enum class OrderState {
 
 class Order {
   public:
+    Order() = default;
     Order (const NewOrderEvent& event, SequenceNumber sequenceNumber) noexcept;
     Order (const NewOrderEvent& event, SequenceNumber sequenceNumber, Quantity filledQuantity) noexcept;
-    OrderState state() const { return state_; }
+
+    bool isValid() const;
     bool isActive() const;
+
+    OrderState state() const { return state_; }
 
 
     UserId userId() const { return userId_; }
@@ -38,6 +42,8 @@ class Order {
 
     Quantity fill(Quantity quantity);
 
+    void cancel();
+
 
   private:
 
@@ -45,7 +51,7 @@ class Order {
 
 
     UserId userId_ {INVALID_USER_ID};
-    OrderId clientOrderId_ {};
+    OrderId clientOrderId_ {INVALID_ORDER_ID};
     Symbol symbol_ {};
 
 

@@ -22,8 +22,8 @@ public:
 
 
 // TODO: change to rvalue references, we always move these anyway
-    virtual void submitNewOrder(const NewOrderEvent& event) = 0;
-    virtual void submitCancelOrder(const CancelOrderEvent& event) = 0;
+    virtual bool submitNewOrder(const NewOrderEvent& event) = 0;
+    virtual bool submitCancelOrder(const CancelOrderEvent& event) = 0;
     virtual void submitTopOfBook(const TopOfBookEvent& event) = 0;
 };
 
@@ -35,8 +35,8 @@ public:
     explicit OrderBook(ReportSink& reportSink) : reportSink_(reportSink) {}
 
 
-    void submitNewOrder(const NewOrderEvent& event) override;
-    void submitCancelOrder(const CancelOrderEvent& event) override;
+    bool submitNewOrder(const NewOrderEvent& event) override;
+    bool submitCancelOrder(const CancelOrderEvent& event) override;
     void submitTopOfBook(const TopOfBookEvent& event) override;
 
 private:
@@ -95,101 +95,20 @@ private:
   AskBook askBook_;
   BidBook bidBook_;
 
-  uint64_t nextSequenceNumber () {
-    static uint64_t sequenceNumber = 0;
-    return sequenceNumber++;
-  }
+  uint64_t nextSequenceNumber();
 
-  bool isAggressive(const NewOrderEvent& event, auto& container, auto cmpFunc) {
-    auto best = container.begin();
-    return best != container.end() && cmpFunc(event, best->price());
-  }
+  bool isAggressive(const NewOrderEvent& event, auto& container, auto cmpFunc);
+  void handleAggressiveOrder(const NewOrderEvent& event, auto& sameSideContainer, auto& opposideSideBook, auto cmpFunc);
+  bool handleNewOrder(const NewOrderEvent& event, auto& sameSideBook, auto& oppositeSideBook, auto cmpFunc);
 
-  bool handleNewOrder(const NewOrderEvent& event, auto& sameSideBook, auto& oppositeSideBook, auto cmpFunc) {
+  void reportFills(PFillVec&& fills);
+  void reportNewOrderCanceled(const NewOrderEvent& event, Quantity filledQuantity);
+  void reportOrderCanceled(const Order& order);
 
-      auto& sameSideContainer = sameSideBook.template get<by_price_time_seq>();
-      auto& oppositeSideContainer = oppositeSideBook.template get<by_price_time_seq>();
-
-      if (isAggressive(event, oppositeSideContainer, cmpFunc)) { 
-        handleAggressiveOrder(event, sameSideContainer, oppositeSideBook, cmpFunc);
-      } else {
-        switch (event.type()) {
-          case Type::Market:
-            {
-              // TODO: use the new cpp20 formatting stuff to add the ide and whatnot here
-              assert(oppositeSideContainer.empty() && "Have opposite side orders but didn't fill a market order, something is wrong!");
-              // if market then there were no opposite side orders, just cancel. 
-              // cancel the order, it's FILL_OR_KILL (Fill and kill too)
-              cancelNewOrderEvent(event, 0);
-            }
-            break;
-          case Type::Limit:
-            {
-              return sameSideContainer.emplace(event, nextSequenceNumber()).second;
-            }
-            break;
-          default:
-            assert(false && "OrderBook::processBuyOrder: Invalid type");
-            break;
-      }
-
-    }
-
-    return false;
-  }
-
-  // TODO: report properly
-  using PFillData = std::pair<OrderId, Quantity>;
-  using PFillVec = std::vector<PFillData>;
-
-  void handleAggressiveOrder(const NewOrderEvent& event, auto& sameSideContainer, auto& opposideSideBook, auto cmpFunc) {
-    auto& oppositeSideContainer = opposideSideBook.template get<by_price_time_seq>();
-
-    PFillVec fills;
-    Quantity filledQuantity = 0;
-    auto it = oppositeSideContainer.begin(); 
-    while (filledQuantity < event.quantity() && it != oppositeSideContainer.end() && cmpFunc(event, it->price())) {
-      auto leaveQuantity = event.quantity() - filledQuantity;
-
-      Quantity filled = 0;
-      bool modified = oppositeSideContainer.modify(it, [&](Order& order) {
-        filled = order.fill(leaveQuantity);
-      });
-
-      assert(modified);
-
-      fills.emplace_back(it->clientOrderId(), filled);
-      fills.emplace_back(event.clientOrderId(), filled);
-      filledQuantity += filled;
-
-      it = it->state() == OrderState::Filled ? oppositeSideContainer.erase(it) : std::next(it);
-
-    }
-
-    reportFills(std::move(fills));
-
-    if (filledQuantity != event.quantity()) {
-      // no more fills so canceling the rest of the order (FILL&KILL)
-      if (it == oppositeSideContainer.end()) {
-        cancelNewOrderEvent(event, filledQuantity);
-      } else {
-        sameSideContainer.emplace(event, nextSequenceNumber(), filledQuantity).second;
-      }
-    }
-  }
-
-  void reportFills(PFillVec&& fills) {
-    reportSink_.submitFills(std::move(fills));
-  }
-
-    // if (filledQuantity < event.quantity()) {
-      // cancel the order, it's FILL_OR_KILL (Fill and kill too)
-
-  void cancelNewOrderEvent(const NewOrderEvent& event, Quantity filledQuantity);
 };
 
 template <typename ReportSink>
-void OrderBook<ReportSink>::submitNewOrder(const NewOrderEvent& event) {
+bool OrderBook<ReportSink>::submitNewOrder(const NewOrderEvent& event) {
 
   // buy crosses asks: market always crosses; otherwise limit >= best ask
   auto crossesBuy = [](const NewOrderEvent& ev, Price bestAsk) noexcept {
@@ -201,33 +120,142 @@ void OrderBook<ReportSink>::submitNewOrder(const NewOrderEvent& event) {
     return ev.type() == Type::Market || ev.price() <= bestBid;
   };
   if (event.side() == Side::Buy) {
-    handleNewOrder(event, bidBook_, askBook_, crossesBuy);
+    return handleNewOrder(event, bidBook_, askBook_, crossesBuy);
   } else if (event.side() == Side::Sell) {
-    handleNewOrder(event, askBook_, bidBook_, crossesSell);
+    return handleNewOrder(event, askBook_, bidBook_, crossesSell);
   } else {
     std::cout << "OrderBook::submitNewOrder: Invalid side" << std::endl;
     // throw an exception once we are doing exception handling properly
-    return;
+    return false;
   }
 }
 
 template <typename ReportSink>
-void OrderBook<ReportSink>::submitCancelOrder(const CancelOrderEvent& event) {
-  // std::cout << "OrderBook::submitCancelOrder: " << event.symbol() << std::endl;
-  // TODO: Implement
+bool OrderBook<ReportSink>::submitCancelOrder(const CancelOrderEvent& event) {
+  auto cancelOrder = [this](auto& book, auto orderId) {
+    auto& container = book.template get<by_order_id>();
+    if (auto it = container.find(orderId); it != container.end()) {
+      Order snapshot = *it;
+      container.erase(it);
+      snapshot.cancel();
+      reportOrderCanceled(snapshot);
+      return true;
+    }
+    return false;
+  };
+  const auto id = event.origOrderId();
+  bool onBid = cancelOrder(bidBook_, id);
+  bool onAsk = !onBid && cancelOrder(askBook_, id);
+  assert(!(onBid && onAsk) && "Order ID present on both sides!");
+  return onBid || onAsk;
 }
 
 template <typename ReportSink>
 void OrderBook<ReportSink>::submitTopOfBook(const TopOfBookEvent& event) {
-  // std::cout << "OrderBook::submitTopOfBook: " << event.symbol() << std::endl;
-  // TODO: Implement
+  reportSink_.submitTopOfBook(TopOfBookReport{
+              bidBook_.empty() ? Order() : *bidBook_.begin(), 
+              askBook_.empty() ? Order() : *askBook_.begin()});
 }
+
 
 
 template <typename ReportSink>
-void OrderBook<ReportSink>::cancelNewOrderEvent(const NewOrderEvent& event, Quantity filledQuantity) {
+uint64_t OrderBook<ReportSink>::nextSequenceNumber() {
+  static uint64_t sequenceNumber = 0;
+  return sequenceNumber++;
+}
+
+template <typename ReportSink>
+bool OrderBook<ReportSink>::isAggressive(const NewOrderEvent& event, auto& container, auto cmpFunc) {
+  auto best = container.begin();
+  return best != container.end() && cmpFunc(event, best->price());
+}
+
+template <typename ReportSink>
+bool OrderBook<ReportSink>::handleNewOrder(const NewOrderEvent& event, auto& sameSideBook, auto& oppositeSideBook, auto cmpFunc) {
+  auto& sameSideContainer = sameSideBook.template get<by_price_time_seq>();
+  auto& oppositeSideContainer = oppositeSideBook.template get<by_price_time_seq>();
+
+  if (isAggressive(event, oppositeSideContainer, cmpFunc)) { 
+    handleAggressiveOrder(event, sameSideContainer, oppositeSideBook, cmpFunc);
+    return true;
+  } else {
+    switch (event.type()) {
+      case Type::Market:
+        {
+          // TODO: use the new cpp20 formatting stuff to add the ide and whatnot here
+          assert(oppositeSideContainer.empty() && "Have opposite side orders but didn't fill a market order, something is wrong!");
+          // if market then there were no opposite side orders, just cancel. 
+          // cancel the order, it's FILL_OR_KILL (Fill and kill too)
+          reportNewOrderCanceled(event, 0);
+          return true;
+        }
+        break;
+      case Type::Limit:
+        {
+          return sameSideContainer.emplace(event, nextSequenceNumber()).second;
+        }
+        break;
+      default:
+        assert(false && "OrderBook::processBuyOrder: Invalid type");
+        break;
+    }
+  }
+
+  return false;
+}
+
+template <typename ReportSink>
+void OrderBook<ReportSink>::handleAggressiveOrder(const NewOrderEvent& event, auto& sameSideContainer, auto& opposideSideBook, auto cmpFunc) {
+  auto& oppositeSideContainer = opposideSideBook.template get<by_price_time_seq>();
+
+  PFillVec fills;
+  Quantity filledQuantity = 0;
+  auto it = oppositeSideContainer.begin(); 
+  while (filledQuantity < event.quantity() && it != oppositeSideContainer.end() && cmpFunc(event, it->price())) {
+    auto leaveQuantity = event.quantity() - filledQuantity;
+
+    Quantity filled = 0;
+    bool modified = oppositeSideContainer.modify(it, [&](Order& order) {
+      filled = order.fill(leaveQuantity);
+    });
+
+    assert(modified);
+
+    fills.emplace_back(it->clientOrderId(), filled);
+    fills.emplace_back(event.clientOrderId(), filled);
+    filledQuantity += filled;
+
+    it = it->state() == OrderState::Filled ? oppositeSideContainer.erase(it) : std::next(it);
+  }
+
+  reportFills(std::move(fills));
+
+  if (filledQuantity != event.quantity()) {
+    // no more fills so canceling the rest of the order (FILL&KILL)
+    if (it == oppositeSideContainer.end()) {
+      reportNewOrderCanceled(event, filledQuantity);
+    } else {
+      sameSideContainer.emplace(event, nextSequenceNumber(), filledQuantity).second;
+    }
+  }
+}
+
+template <typename ReportSink>
+void OrderBook<ReportSink>::reportNewOrderCanceled(const NewOrderEvent& event, Quantity filledQuantity) {
   reportSink_.submitCanceledOrder(CanceledOrderReport{event.clientOrderId(), event.quantity() - filledQuantity, CancelReason::Fill_And_Kill});
 }
+
+template <typename ReportSink>
+void OrderBook<ReportSink>::reportOrderCanceled(const Order& order) {
+  reportSink_.submitCanceledOrder(CanceledOrderReport{order.clientOrderId(), order.openQuantity(), CancelReason::User_Canceled});
+}
+
+template <typename ReportSink>
+void OrderBook<ReportSink>::reportFills(PFillVec&& fills) {
+  reportSink_.submitFills(std::move(fills));
+}
+
 
 } // namespace Exchange
 
