@@ -32,7 +32,13 @@ OrderBookManager::OrderBookManager(OrderBookManager::OrderBookMap&& map, int num
     auto symbol = Symbol{symStr};
     auto it = map.find(symbol);
     auto& shard = shards_[shardIdx(symbol)];
-    shard->orderBooks_[symbol] = (it == map.end() ? std::make_unique<OrderBook<ReportSink>>(shard->reportSink_) : std::move(it->second));
+    if (it == map.end()) {
+      auto sink = std::make_unique<ReportSink>();
+      shard->orderBooks_[symbol] = std::make_unique<OrderBook<ReportSink>>(symbol, std::move(sink));
+    }
+    else {
+      shard->orderBooks_[symbol] = std::move(it->second);
+    }
   }
 
   std::ranges::for_each(shards_, [](auto& shard) { shard->start(); });

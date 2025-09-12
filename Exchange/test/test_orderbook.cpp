@@ -11,24 +11,26 @@ namespace test {
 // Mock ReportSink for testing using older Google Mock syntax
 class MockReportSink {
 public:
-    MOCK_METHOD1(submitFills, bool(std::vector<std::pair<OrderId, Quantity>>&& fills));
-    MOCK_METHOD1(submitCanceledOrder, bool(CanceledOrderReport&& report));
+    MOCK_METHOD1(submitFills, bool(ExecutionReportCollection&& fills));
+    MOCK_METHOD1(submitCanceledOrder, bool(OrderCanceledReport&& report));
     MOCK_METHOD1(submitTopOfBook, bool(TopOfBookReport&& report));
 };
 
 class OrderBookTest : public ::testing::Test {
 protected:
     void SetUp() override {
-        mockReportSink_ = std::make_unique<MockReportSink>();
-        orderBook_ = std::make_unique<OrderBook<MockReportSink>>(*mockReportSink_);
+      auto mockReportSink = std::make_unique<MockReportSink>();
+      mockReportSink_ = mockReportSink.get();
+
+      orderBook_ = std::make_unique<OrderBook<MockReportSink>>(Symbol{"AAPL"}, std::move(mockReportSink));
     }
 
     void TearDown() override {
+        mockReportSink_ = nullptr;
         orderBook_.reset();
-        mockReportSink_.reset();
     }
 
-    std::unique_ptr<MockReportSink> mockReportSink_;
+    MockReportSink* mockReportSink_ {nullptr};
     std::unique_ptr<OrderBook<MockReportSink>> orderBook_;
 };
 
@@ -60,20 +62,19 @@ TEST_F(OrderBookTest, SubmitNewOrder_BuyLimitOrder_AddsToBidBook) {
     orderBook_->submitTopOfBook(topOfBookEvent);
 
     // Assert - Verify top of book shows correct bid order
-    EXPECT_EQ(capturedTopOfBook.bid_order.clientOrderId(), 1001);
-    EXPECT_EQ(capturedTopOfBook.bid_order.quantity(), 100);
-    EXPECT_EQ(capturedTopOfBook.bid_order.openQuantity(), 100);  // No fills yet
-    EXPECT_EQ(capturedTopOfBook.bid_order.price(), toPrice(150.00, TWO_DIGITS_PRICE_SPEC));
-    EXPECT_EQ(capturedTopOfBook.bid_order.side(), Side::Buy);
+    EXPECT_EQ(capturedTopOfBook.bid_order_.orderId_, 1001);
+    EXPECT_EQ(capturedTopOfBook.bid_order_.openQuantity_, 100);
+    EXPECT_EQ(capturedTopOfBook.bid_order_.openQuantity_, 100);  // No fills yet
+    EXPECT_EQ(capturedTopOfBook.bid_order_.price_, toPrice(150.00, TWO_DIGITS_PRICE_SPEC));
     // Ask should be empty (default Order)
-    EXPECT_FALSE(capturedTopOfBook.ask_order.isValid());
+    EXPECT_FALSE(capturedTopOfBook.ask_order_.isValid());
 
     // Now cancel the order and verify the cancellation report
     auto cancelEvent = CancelOrderEvent("user123"_uid, 1001, "AAPL"_sym, 1001);
     
-    CanceledOrderReport capturedCancel;
+    OrderCanceledReport capturedCancel;
     EXPECT_CALL(*mockReportSink_, submitCanceledOrder(testing::_))
-        .WillOnce(testing::Invoke([&capturedCancel](CanceledOrderReport&& report) {
+        .WillOnce(testing::Invoke([&capturedCancel](OrderCanceledReport&& report) {
             capturedCancel = std::move(report);
             return true;
         }));
@@ -82,9 +83,9 @@ TEST_F(OrderBookTest, SubmitNewOrder_BuyLimitOrder_AddsToBidBook) {
 
     // Assert - Verify cancellation was successful and reported correctly
     EXPECT_TRUE(cancelResult);
-    EXPECT_EQ(capturedCancel.orderId, 1001);
-    EXPECT_EQ(capturedCancel.remainingQuantity, 100);  // Full quantity cancelled
-    EXPECT_EQ(capturedCancel.reason, CancelReason::User_Canceled);
+    EXPECT_EQ(capturedCancel.orderId_, 1001);
+    EXPECT_EQ(capturedCancel.remainingQuantity_, 100);  // Full quantity cancelled
+    EXPECT_EQ(capturedCancel.reason_, CancelReason::User_Canceled);
 }
 
 TEST_F(OrderBookTest, SubmitNewOrder_SellLimitOrder_AddsToAskBook) {
@@ -115,20 +116,19 @@ TEST_F(OrderBookTest, SubmitNewOrder_SellLimitOrder_AddsToAskBook) {
     orderBook_->submitTopOfBook(topOfBookEvent);
 
     // Assert - Verify top of book shows correct ask order
-    EXPECT_EQ(capturedTopOfBook.ask_order.clientOrderId(), 1002);
-    EXPECT_EQ(capturedTopOfBook.ask_order.quantity(), 50);
-    EXPECT_EQ(capturedTopOfBook.ask_order.openQuantity(), 50);  // No fills yet
-    EXPECT_EQ(capturedTopOfBook.ask_order.price(), toPrice(151.00, TWO_DIGITS_PRICE_SPEC));
-    EXPECT_EQ(capturedTopOfBook.ask_order.side(), Side::Sell);
+    EXPECT_EQ(capturedTopOfBook.ask_order_.orderId_, 1002);
+    EXPECT_EQ(capturedTopOfBook.ask_order_.openQuantity_, 50);
+    EXPECT_EQ(capturedTopOfBook.ask_order_.openQuantity_, 50);  // No fills yet
+    EXPECT_EQ(capturedTopOfBook.ask_order_.price_, toPrice(151.00, TWO_DIGITS_PRICE_SPEC));
     // Bid should be empty (default Order)
-    EXPECT_FALSE(capturedTopOfBook.bid_order.isValid());
+    EXPECT_FALSE(capturedTopOfBook.bid_order_.isValid());
 
     // Now cancel the order and verify the cancellation report
     auto cancelEvent = CancelOrderEvent("user456"_uid, 1002, "AAPL"_sym, 1002);
     
-    CanceledOrderReport capturedCancel;
+    OrderCanceledReport capturedCancel;
     EXPECT_CALL(*mockReportSink_, submitCanceledOrder(testing::_))
-        .WillOnce(testing::Invoke([&capturedCancel](CanceledOrderReport&& report) {
+        .WillOnce(testing::Invoke([&capturedCancel](OrderCanceledReport&& report) {
             capturedCancel = std::move(report);
             return true;
         }));
@@ -137,9 +137,9 @@ TEST_F(OrderBookTest, SubmitNewOrder_SellLimitOrder_AddsToAskBook) {
 
     // Assert - Verify cancellation was successful and reported correctly
     EXPECT_TRUE(cancelResult);
-    EXPECT_EQ(capturedCancel.orderId, 1002);
-    EXPECT_EQ(capturedCancel.remainingQuantity, 50);  // Full quantity cancelled
-    EXPECT_EQ(capturedCancel.reason, CancelReason::User_Canceled);
+    EXPECT_EQ(capturedCancel.orderId_, 1002);
+    EXPECT_EQ(capturedCancel.remainingQuantity_, 50);  // Full quantity cancelled
+    EXPECT_EQ(capturedCancel.reason_, CancelReason::User_Canceled);
 }
 
 TEST_F(OrderBookTest, SubmitNewOrder_BuyMarketOrder_WithNoSells_CancelsOrder) {
@@ -155,9 +155,9 @@ TEST_F(OrderBookTest, SubmitNewOrder_BuyMarketOrder_WithNoSells_CancelsOrder) {
     );
 
     // Capture the cancellation to verify it
-    CanceledOrderReport capturedCancel;
+    OrderCanceledReport capturedCancel;
     EXPECT_CALL(*mockReportSink_, submitCanceledOrder(testing::_))
-        .WillOnce(testing::Invoke([&capturedCancel](CanceledOrderReport&& report) {
+        .WillOnce(testing::Invoke([&capturedCancel](OrderCanceledReport&& report) {
             capturedCancel = std::move(report);
             return true;
         }));
@@ -166,9 +166,9 @@ TEST_F(OrderBookTest, SubmitNewOrder_BuyMarketOrder_WithNoSells_CancelsOrder) {
     orderBook_->submitNewOrder(event);
 
     // Assert - Verify the cancellation details
-    EXPECT_EQ(capturedCancel.orderId, 1003);                    // Correct order ID
-    EXPECT_EQ(capturedCancel.remainingQuantity, 100);           // Full quantity cancelled (no fills)
-    EXPECT_EQ(capturedCancel.reason, CancelReason::Fill_And_Kill); // Correct reason
+    EXPECT_EQ(capturedCancel.orderId_, 1003);                    // Correct order ID
+    EXPECT_EQ(capturedCancel.remainingQuantity_, 100);           // Full quantity cancelled (no fills)
+    EXPECT_EQ(capturedCancel.reason_, CancelReason::Fill_And_Kill); // Correct reason
 
     
 }
@@ -200,13 +200,11 @@ TEST_F(OrderBookTest, SubmitNewOrder_AggressiveBuy_FillsWithExistingSell) {
     orderBook_->submitTopOfBook(topOfBookEvent1);
 
     // Assert - Verify top of book shows only ask order before aggressive order
-    EXPECT_EQ(capturedTopOfBook1.ask_order.clientOrderId(), 2001);
-    EXPECT_EQ(capturedTopOfBook1.ask_order.quantity(), 100);
-    EXPECT_EQ(capturedTopOfBook1.ask_order.openQuantity(), 100);  // No fills yet
-    EXPECT_EQ(capturedTopOfBook1.ask_order.price(), toPrice(150.00, TWO_DIGITS_PRICE_SPEC));
-    EXPECT_EQ(capturedTopOfBook1.ask_order.side(), Side::Sell);
+    EXPECT_EQ(capturedTopOfBook1.ask_order_.orderId_, 2001);
+    EXPECT_EQ(capturedTopOfBook1.ask_order_.openQuantity_, 100);  // No fills yet
+    EXPECT_EQ(capturedTopOfBook1.ask_order_.price_, toPrice(150.00, TWO_DIGITS_PRICE_SPEC));
     // Bid should be empty (default Order)
-    EXPECT_FALSE(capturedTopOfBook1.bid_order.isValid());
+    EXPECT_FALSE(capturedTopOfBook1.bid_order_.isValid());
 
     // Now add an aggressive buy order
     auto buyEvent = NewOrderEvent(
@@ -220,9 +218,9 @@ TEST_F(OrderBookTest, SubmitNewOrder_AggressiveBuy_FillsWithExistingSell) {
     );
 
     // Capture the fills to verify them
-    std::vector<std::pair<OrderId, Quantity>> capturedFills;
+    ExecutionReportCollection capturedFills;
     EXPECT_CALL(*mockReportSink_, submitFills(testing::_))
-        .WillOnce(testing::Invoke([&capturedFills](std::vector<std::pair<OrderId, Quantity>>&& fills) {
+        .WillOnce(testing::Invoke([&capturedFills](ExecutionReportCollection&& fills) {
             capturedFills = std::move(fills);
             return true;
         }));
@@ -232,10 +230,12 @@ TEST_F(OrderBookTest, SubmitNewOrder_AggressiveBuy_FillsWithExistingSell) {
 
     // Assert - Verify the fill details
     ASSERT_EQ(capturedFills.size(), 2);  // Should have 2 entries: sell order fill + buy order fill
-    EXPECT_EQ(capturedFills[0].first, 2001);   // Sell order ID
-    EXPECT_EQ(capturedFills[0].second, 50);    // 50 shares filled
-    EXPECT_EQ(capturedFills[1].first, 2002);   // Buy order ID  
-    EXPECT_EQ(capturedFills[1].second, 50);    // 50 shares filled
+    EXPECT_EQ(capturedFills[0].orderId_, 2001);   // Sell order ID
+    EXPECT_EQ(capturedFills[0].otherOrderId_, 2002);   // Buy order ID
+    EXPECT_EQ(capturedFills[0].filledQuantity_, 50);    // 50 shares filled
+    EXPECT_EQ(capturedFills[1].orderId_, 2002);   // Buy order ID  
+    EXPECT_EQ(capturedFills[1].otherOrderId_, 2001);   // Sell order ID
+    EXPECT_EQ(capturedFills[1].filledQuantity_, 50);    // 50 shares filled
 
     // Test top of book after partial fill - should show remaining sell order
     auto topOfBookEvent2 = TopOfBookEvent("user456"_uid, 2001, "AAPL"_sym);
@@ -250,20 +250,18 @@ TEST_F(OrderBookTest, SubmitNewOrder_AggressiveBuy_FillsWithExistingSell) {
     orderBook_->submitTopOfBook(topOfBookEvent2);
 
     // Assert - Verify top of book shows remaining ask order after partial fill
-    EXPECT_EQ(capturedTopOfBook2.ask_order.clientOrderId(), 2001);
-    EXPECT_EQ(capturedTopOfBook2.ask_order.quantity(), 100);  // Order still shows original quantity (100)
-    EXPECT_EQ(capturedTopOfBook2.ask_order.openQuantity(), 50);  // 50 shares remaining after 50 filled
-    EXPECT_EQ(capturedTopOfBook2.ask_order.price(), toPrice(150.00, TWO_DIGITS_PRICE_SPEC));
-    EXPECT_EQ(capturedTopOfBook2.ask_order.side(), Side::Sell);
+    EXPECT_EQ(capturedTopOfBook2.ask_order_.orderId_, 2001);
+    EXPECT_EQ(capturedTopOfBook2.ask_order_.openQuantity_, 50);  // 50 shares remaining after 50 filled
+    EXPECT_EQ(capturedTopOfBook2.ask_order_.price_, toPrice(150.00, TWO_DIGITS_PRICE_SPEC));
     // Bid should still be empty (default Order)
-    EXPECT_FALSE(capturedTopOfBook2.bid_order.isValid());
+    EXPECT_FALSE(capturedTopOfBook2.bid_order_.isValid());
 
     // Now cancel the remaining 50 shares of the sell order
     auto cancelEvent = CancelOrderEvent("user456"_uid, 2001, "AAPL"_sym, 2001);
     
-    CanceledOrderReport capturedCancel;
+    OrderCanceledReport capturedCancel;
     EXPECT_CALL(*mockReportSink_, submitCanceledOrder(testing::_))
-        .WillOnce(testing::Invoke([&capturedCancel](CanceledOrderReport&& report) {
+        .WillOnce(testing::Invoke([&capturedCancel](OrderCanceledReport&& report) {
             capturedCancel = std::move(report);
             return true;
         }));
@@ -272,9 +270,9 @@ TEST_F(OrderBookTest, SubmitNewOrder_AggressiveBuy_FillsWithExistingSell) {
 
     // Assert - Verify cancellation was successful and reported correct remaining quantity
     EXPECT_TRUE(cancelResult);
-    EXPECT_EQ(capturedCancel.orderId, 2001);
-    EXPECT_EQ(capturedCancel.remainingQuantity, 50);  // 50 shares remaining (100 - 50 filled)
-    EXPECT_EQ(capturedCancel.reason, CancelReason::User_Canceled);
+    EXPECT_EQ(capturedCancel.orderId_, 2001);
+    EXPECT_EQ(capturedCancel.remainingQuantity_, 50);  // 50 shares remaining (100 - 50 filled)
+    EXPECT_EQ(capturedCancel.reason_, CancelReason::User_Canceled);
 }
 
 TEST_F(OrderBookTest, SubmitNewOrder_AggressiveSell_FillsWithExistingBuy) {
@@ -303,9 +301,9 @@ TEST_F(OrderBookTest, SubmitNewOrder_AggressiveSell_FillsWithExistingBuy) {
     );
 
     // Capture the fills to verify them
-    std::vector<std::pair<OrderId, Quantity>> capturedFills;
+    ExecutionReportCollection capturedFills;
     EXPECT_CALL(*mockReportSink_, submitFills(testing::_))
-        .WillOnce(testing::Invoke([&capturedFills](std::vector<std::pair<OrderId, Quantity>>&& fills) {
+        .WillOnce(testing::Invoke([&capturedFills](ExecutionReportCollection&& fills) {
             capturedFills = std::move(fills);
             return true;
         }));
@@ -315,17 +313,19 @@ TEST_F(OrderBookTest, SubmitNewOrder_AggressiveSell_FillsWithExistingBuy) {
 
     // Assert - Verify the fill details
     ASSERT_EQ(capturedFills.size(), 2);  // Should have 2 entries: buy order fill + sell order fill
-    EXPECT_EQ(capturedFills[0].first, 3001);   // Buy order ID
-    EXPECT_EQ(capturedFills[0].second, 75);    // 75 shares filled
-    EXPECT_EQ(capturedFills[1].first, 3002);   // Sell order ID  
-    EXPECT_EQ(capturedFills[1].second, 75);    // 75 shares filled
+    EXPECT_EQ(capturedFills[0].orderId_, 3001);   // Buy order ID
+    EXPECT_EQ(capturedFills[0].otherOrderId_, 3002);   // Sell order ID
+    EXPECT_EQ(capturedFills[0].filledQuantity_, 75);    // 75 shares filled
+    EXPECT_EQ(capturedFills[1].orderId_, 3002);   // Sell order ID  
+    EXPECT_EQ(capturedFills[1].otherOrderId_, 3001);   // Buy order ID
+    EXPECT_EQ(capturedFills[1].filledQuantity_, 75);    // 75 shares filled
 
     // Now cancel the remaining 25 shares of the buy order
     auto cancelEvent = CancelOrderEvent("user123"_uid, 3001, "AAPL"_sym, 3001);
     
-    CanceledOrderReport capturedCancel;
+    OrderCanceledReport capturedCancel;
     EXPECT_CALL(*mockReportSink_, submitCanceledOrder(testing::_))
-        .WillOnce(testing::Invoke([&capturedCancel](CanceledOrderReport&& report) {
+        .WillOnce(testing::Invoke([&capturedCancel](OrderCanceledReport&& report) {
             capturedCancel = std::move(report);
             return true;
         }));
@@ -334,9 +334,9 @@ TEST_F(OrderBookTest, SubmitNewOrder_AggressiveSell_FillsWithExistingBuy) {
 
     // Assert - Verify cancellation was successful and reported correct remaining quantity
     EXPECT_TRUE(cancelResult);
-    EXPECT_EQ(capturedCancel.orderId, 3001);
-    EXPECT_EQ(capturedCancel.remainingQuantity, 25);  // 25 shares remaining (100 - 75 filled)
-    EXPECT_EQ(capturedCancel.reason, CancelReason::User_Canceled);
+    EXPECT_EQ(capturedCancel.orderId_, 3001);
+    EXPECT_EQ(capturedCancel.remainingQuantity_, 25);  // 25 shares remaining (100 - 75 filled)
+    EXPECT_EQ(capturedCancel.reason_, CancelReason::User_Canceled);
 }
 
 TEST_F(OrderBookTest, SubmitNewOrder_PartialFill_RemainingGoesToBook) {
@@ -377,9 +377,9 @@ TEST_F(OrderBookTest, SubmitNewOrder_PartialFill_RemainingGoesToBook) {
     );
 
     // Capture the fills to verify them
-    std::vector<std::pair<OrderId, Quantity>> capturedFills;
+    ExecutionReportCollection capturedFills;
     EXPECT_CALL(*mockReportSink_, submitFills(testing::_))
-        .WillOnce(testing::Invoke([&capturedFills](std::vector<std::pair<OrderId, Quantity>>&& fills) {
+        .WillOnce(testing::Invoke([&capturedFills](ExecutionReportCollection&& fills) {
             capturedFills = std::move(fills);
             return true;
         }));
@@ -389,17 +389,19 @@ TEST_F(OrderBookTest, SubmitNewOrder_PartialFill_RemainingGoesToBook) {
 
     // Assert - Verify the fill details
     ASSERT_EQ(capturedFills.size(), 2);  // Should have 2 entries: sell order fill + buy order fill
-    EXPECT_EQ(capturedFills[0].first, 4001);   // Sell order ID
-    EXPECT_EQ(capturedFills[0].second, 100);   // 100 shares filled (fully filled)
-    EXPECT_EQ(capturedFills[1].first, 4002);   // Buy order ID  
-    EXPECT_EQ(capturedFills[1].second, 100);   // 100 shares filled (partial fill of 150)
+    EXPECT_EQ(capturedFills[0].orderId_, 4001);   // Sell order ID
+    EXPECT_EQ(capturedFills[0].otherOrderId_, 4002);   // Buy order ID
+    EXPECT_EQ(capturedFills[0].filledQuantity_, 100);   // 100 shares filled (fully filled)
+    EXPECT_EQ(capturedFills[1].orderId_, 4002);   // Buy order ID  
+    EXPECT_EQ(capturedFills[1].otherOrderId_, 4001);   // Sell order ID
+    EXPECT_EQ(capturedFills[1].filledQuantity_, 100);   // 100 shares filled (partial fill of 150)
 
     // Now cancel the remaining 50 shares of the buy order
     auto cancelEvent = CancelOrderEvent("user123"_uid, 4002, "AAPL"_sym, 4002);
     
-    CanceledOrderReport capturedCancel;
+    OrderCanceledReport capturedCancel;
     EXPECT_CALL(*mockReportSink_, submitCanceledOrder(testing::_))
-        .WillOnce(testing::Invoke([&capturedCancel](CanceledOrderReport&& report) {
+        .WillOnce(testing::Invoke([&capturedCancel](OrderCanceledReport&& report) {
             capturedCancel = std::move(report);
             return true;
         }));
@@ -408,9 +410,9 @@ TEST_F(OrderBookTest, SubmitNewOrder_PartialFill_RemainingGoesToBook) {
 
     // Assert - Verify cancellation was successful and reported correct remaining quantity
     EXPECT_TRUE(cancelResult);
-    EXPECT_EQ(capturedCancel.orderId, 4002);
-    EXPECT_EQ(capturedCancel.remainingQuantity, 50);  // 50 shares remaining (150 - 100 filled)
-    EXPECT_EQ(capturedCancel.reason, CancelReason::User_Canceled);
+    EXPECT_EQ(capturedCancel.orderId_, 4002);
+    EXPECT_EQ(capturedCancel.remainingQuantity_, 50);  // 50 shares remaining (150 - 100 filled)
+    EXPECT_EQ(capturedCancel.reason_, CancelReason::User_Canceled);
 }
 
 TEST_F(OrderBookTest, SubmitNewOrder_PartialFill_ThenCancelled) {
@@ -438,17 +440,17 @@ TEST_F(OrderBookTest, SubmitNewOrder_PartialFill_ThenCancelled) {
     );
 
     // Capture both fills and cancellation
-    std::vector<std::pair<OrderId, Quantity>> capturedFills;
-    CanceledOrderReport capturedCancel;
+    ExecutionReportCollection capturedFills;
+    OrderCanceledReport capturedCancel;
     
     EXPECT_CALL(*mockReportSink_, submitFills(testing::_))
-        .WillOnce(testing::Invoke([&capturedFills](std::vector<std::pair<OrderId, Quantity>>&& fills) {
+        .WillOnce(testing::Invoke([&capturedFills](ExecutionReportCollection&& fills) {
             capturedFills = std::move(fills);
             return true;
         }));
     
     EXPECT_CALL(*mockReportSink_, submitCanceledOrder(testing::_))
-        .WillOnce(testing::Invoke([&capturedCancel](CanceledOrderReport&& report) {
+        .WillOnce(testing::Invoke([&capturedCancel](OrderCanceledReport&& report) {
             capturedCancel = std::move(report);
             return true;
         }));
@@ -458,15 +460,17 @@ TEST_F(OrderBookTest, SubmitNewOrder_PartialFill_ThenCancelled) {
 
     // Assert - Verify the fill details
     ASSERT_EQ(capturedFills.size(), 2);  // Should have 2 entries: sell order fill + buy order fill
-    EXPECT_EQ(capturedFills[0].first, 5001);   // Sell order ID
-    EXPECT_EQ(capturedFills[0].second, 30);    // 30 shares filled (fully filled)
-    EXPECT_EQ(capturedFills[1].first, 5002);   // Buy order ID  
-    EXPECT_EQ(capturedFills[1].second, 30);    // 30 shares filled (partial fill of 100)
+    EXPECT_EQ(capturedFills[0].orderId_, 5001);   // Sell order ID
+    EXPECT_EQ(capturedFills[0].otherOrderId_, 5002);   // Buy order ID
+    EXPECT_EQ(capturedFills[0].filledQuantity_, 30);    // 30 shares filled (fully filled)
+    EXPECT_EQ(capturedFills[1].orderId_, 5002);   // Buy order ID  
+    EXPECT_EQ(capturedFills[1].otherOrderId_, 5001);   // Sell order ID
+    EXPECT_EQ(capturedFills[1].filledQuantity_, 30);    // 30 shares filled (partial fill of 100)
 
     // Assert - Verify the cancellation details
-    EXPECT_EQ(capturedCancel.orderId, 5002);                    // Buy order ID
-    EXPECT_EQ(capturedCancel.remainingQuantity, 70);            // 70 shares cancelled (100 - 30)
-    EXPECT_EQ(capturedCancel.reason, CancelReason::Fill_And_Kill); // Correct reason
+    EXPECT_EQ(capturedCancel.orderId_, 5002);                    // Buy order ID
+    EXPECT_EQ(capturedCancel.remainingQuantity_, 70);            // 70 shares cancelled (100 - 30)
+    EXPECT_EQ(capturedCancel.reason_, CancelReason::Fill_And_Kill); // Correct reason
 }
 
 TEST_F(OrderBookTest, SubmitNewOrder_FillsMultipleOrders_PriceTimePriority) {
@@ -532,9 +536,9 @@ TEST_F(OrderBookTest, SubmitNewOrder_FillsMultipleOrders_PriceTimePriority) {
     );
 
     // Capture the fills to verify them
-    std::vector<std::pair<OrderId, Quantity>> capturedFills;
+    ExecutionReportCollection capturedFills;
     EXPECT_CALL(*mockReportSink_, submitFills(testing::_))
-        .WillOnce(testing::Invoke([&capturedFills](std::vector<std::pair<OrderId, Quantity>>&& fills) {
+        .WillOnce(testing::Invoke([&capturedFills](ExecutionReportCollection&& fills) {
             capturedFills = std::move(fills);
             return true;
         }));
@@ -551,22 +555,28 @@ TEST_F(OrderBookTest, SubmitNewOrder_FillsMultipleOrders_PriceTimePriority) {
     // Each fill appears twice: once for the sell order, once for the buy order
     
     // Order 4: 20 shares at $149.00 (best price first)
-    EXPECT_EQ(capturedFills[0].first, 6004);   // Sell order 4
-    EXPECT_EQ(capturedFills[0].second, 20);    // 20 shares
-    EXPECT_EQ(capturedFills[1].first, 6005);   // Buy order
-    EXPECT_EQ(capturedFills[1].second, 20);    // 20 shares
+    EXPECT_EQ(capturedFills[0].orderId_, 6004);   // Sell order 4
+    EXPECT_EQ(capturedFills[0].otherOrderId_, 6005);   // Buy order
+    EXPECT_EQ(capturedFills[0].filledQuantity_, 20);    // 20 shares
+    EXPECT_EQ(capturedFills[1].orderId_, 6005);   // Buy order
+    EXPECT_EQ(capturedFills[1].otherOrderId_, 6004);   // Sell order 4
+    EXPECT_EQ(capturedFills[1].filledQuantity_, 20);    // 20 shares
     
     // Order 3: 40 shares at $149.50
-    EXPECT_EQ(capturedFills[2].first, 6003);   // Sell order 3
-    EXPECT_EQ(capturedFills[2].second, 40);    // 40 shares
-    EXPECT_EQ(capturedFills[3].first, 6005);   // Buy order
-    EXPECT_EQ(capturedFills[3].second, 40);    // 40 shares
+    EXPECT_EQ(capturedFills[2].orderId_, 6003);   // Sell order 3
+    EXPECT_EQ(capturedFills[2].otherOrderId_, 6005);   // Buy order
+    EXPECT_EQ(capturedFills[2].filledQuantity_, 40);    // 40 shares
+    EXPECT_EQ(capturedFills[3].orderId_, 6005);   // Buy order
+    EXPECT_EQ(capturedFills[3].otherOrderId_, 6003);   // Sell order 3
+    EXPECT_EQ(capturedFills[3].filledQuantity_, 40);    // 40 shares
     
     // Order 1: 40 shares at $150.00 (partial fill of 50, earlier time than order 2)
-    EXPECT_EQ(capturedFills[4].first, 6001);   // Sell order 1
-    EXPECT_EQ(capturedFills[4].second, 40);    // 40 shares (partial)
-    EXPECT_EQ(capturedFills[5].first, 6005);   // Buy order
-    EXPECT_EQ(capturedFills[5].second, 40);    // 40 shares (partial)
+    EXPECT_EQ(capturedFills[4].orderId_, 6001);   // Sell order 1
+    EXPECT_EQ(capturedFills[4].otherOrderId_, 6005);   // Buy order
+    EXPECT_EQ(capturedFills[4].filledQuantity_, 40);    // 40 shares (partial)
+    EXPECT_EQ(capturedFills[5].orderId_, 6005);   // Buy order
+    EXPECT_EQ(capturedFills[5].otherOrderId_, 6001);   // Sell order 1
+    EXPECT_EQ(capturedFills[5].filledQuantity_, 40);    // 40 shares (partial)
 }
 
 TEST_F(OrderBookTest, SubmitNewOrder_MarketOrder_FillsMultipleOrders) {
@@ -616,9 +626,9 @@ TEST_F(OrderBookTest, SubmitNewOrder_MarketOrder_FillsMultipleOrders) {
     );
 
     // Capture the fills to verify them
-    std::vector<std::pair<OrderId, Quantity>> capturedFills;
+    ExecutionReportCollection capturedFills;
     EXPECT_CALL(*mockReportSink_, submitFills(testing::_))
-        .WillOnce(testing::Invoke([&capturedFills](std::vector<std::pair<OrderId, Quantity>>&& fills) {
+        .WillOnce(testing::Invoke([&capturedFills](ExecutionReportCollection&& fills) {
             capturedFills = std::move(fills);
             return true;
         }));
@@ -632,22 +642,28 @@ TEST_F(OrderBookTest, SubmitNewOrder_MarketOrder_FillsMultipleOrders) {
     
     // Check that all 3 sell orders are filled (in price priority order)
     // Order 1: 25 shares at $150.00 (best price first)
-    EXPECT_EQ(capturedFills[0].first, 7001);   // Sell order 1
-    EXPECT_EQ(capturedFills[0].second, 25);    // 25 shares
-    EXPECT_EQ(capturedFills[1].first, 7004);   // Buy order
-    EXPECT_EQ(capturedFills[1].second, 25);    // 25 shares
+    EXPECT_EQ(capturedFills[0].orderId_, 7001);   // Sell order 1
+    EXPECT_EQ(capturedFills[0].otherOrderId_, 7004);   // Buy order
+    EXPECT_EQ(capturedFills[0].filledQuantity_, 25);    // 25 shares
+    EXPECT_EQ(capturedFills[1].orderId_, 7004);   // Buy order
+    EXPECT_EQ(capturedFills[1].otherOrderId_, 7001);   // Sell order 1
+    EXPECT_EQ(capturedFills[1].filledQuantity_, 25);    // 25 shares
     
     // Order 2: 35 shares at $151.00
-    EXPECT_EQ(capturedFills[2].first, 7002);   // Sell order 2
-    EXPECT_EQ(capturedFills[2].second, 35);    // 35 shares
-    EXPECT_EQ(capturedFills[3].first, 7004);   // Buy order
-    EXPECT_EQ(capturedFills[3].second, 35);    // 35 shares
+    EXPECT_EQ(capturedFills[2].orderId_, 7002);   // Sell order 2
+    EXPECT_EQ(capturedFills[2].otherOrderId_, 7004);   // Buy order
+    EXPECT_EQ(capturedFills[2].filledQuantity_, 35);    // 35 shares
+    EXPECT_EQ(capturedFills[3].orderId_, 7004);   // Buy order
+    EXPECT_EQ(capturedFills[3].otherOrderId_, 7002);   // Sell order 2
+    EXPECT_EQ(capturedFills[3].filledQuantity_, 35);    // 35 shares
     
     // Order 3: 20 shares at $152.00 (partial fill of 40)
-    EXPECT_EQ(capturedFills[4].first, 7003);   // Sell order 3
-    EXPECT_EQ(capturedFills[4].second, 20);    // 20 shares (partial)
-    EXPECT_EQ(capturedFills[5].first, 7004);   // Buy order
-    EXPECT_EQ(capturedFills[5].second, 20);    // 20 shares (partial)
+    EXPECT_EQ(capturedFills[4].orderId_, 7003);   // Sell order 3
+    EXPECT_EQ(capturedFills[4].otherOrderId_, 7004);   // Buy order
+    EXPECT_EQ(capturedFills[4].filledQuantity_, 20);    // 20 shares (partial)
+    EXPECT_EQ(capturedFills[5].orderId_, 7004);   // Buy order
+    EXPECT_EQ(capturedFills[5].otherOrderId_, 7003);   // Sell order 3
+    EXPECT_EQ(capturedFills[5].filledQuantity_, 20);    // 20 shares (partial)
 }
 
 TEST_F(OrderBookTest, SubmitNewOrder_MarketSellOrder_FillsMultipleOrders) {
@@ -697,9 +713,9 @@ TEST_F(OrderBookTest, SubmitNewOrder_MarketSellOrder_FillsMultipleOrders) {
     );
 
     // Capture the fills to verify them
-    std::vector<std::pair<OrderId, Quantity>> capturedFills;
+    ExecutionReportCollection capturedFills;
     EXPECT_CALL(*mockReportSink_, submitFills(testing::_))
-        .WillOnce(testing::Invoke([&capturedFills](std::vector<std::pair<OrderId, Quantity>>&& fills) {
+        .WillOnce(testing::Invoke([&capturedFills](ExecutionReportCollection&& fills) {
             capturedFills = std::move(fills);
             return true;
         }));
@@ -713,22 +729,28 @@ TEST_F(OrderBookTest, SubmitNewOrder_MarketSellOrder_FillsMultipleOrders) {
     
     // Check that all 3 buy orders are filled (in price priority order - highest price first)
     // Order 1: 30 shares at $155.00 (best price first)
-    EXPECT_EQ(capturedFills[0].first, 7501);   // Buy order 1
-    EXPECT_EQ(capturedFills[0].second, 30);    // 30 shares
-    EXPECT_EQ(capturedFills[1].first, 7504);   // Sell order
-    EXPECT_EQ(capturedFills[1].second, 30);    // 30 shares
+    EXPECT_EQ(capturedFills[0].orderId_, 7501);   // Buy order 1
+    EXPECT_EQ(capturedFills[0].otherOrderId_, 7504);   // Sell order
+    EXPECT_EQ(capturedFills[0].filledQuantity_, 30);    // 30 shares
+    EXPECT_EQ(capturedFills[1].orderId_, 7504);   // Sell order
+    EXPECT_EQ(capturedFills[1].otherOrderId_, 7501);   // Buy order 1
+    EXPECT_EQ(capturedFills[1].filledQuantity_, 30);    // 30 shares
     
     // Order 2: 45 shares at $154.00
-    EXPECT_EQ(capturedFills[2].first, 7502);   // Buy order 2
-    EXPECT_EQ(capturedFills[2].second, 45);    // 45 shares
-    EXPECT_EQ(capturedFills[3].first, 7504);   // Sell order
-    EXPECT_EQ(capturedFills[3].second, 45);    // 45 shares
+    EXPECT_EQ(capturedFills[2].orderId_, 7502);   // Buy order 2
+    EXPECT_EQ(capturedFills[2].otherOrderId_, 7504);   // Sell order
+    EXPECT_EQ(capturedFills[2].filledQuantity_, 45);    // 45 shares
+    EXPECT_EQ(capturedFills[3].orderId_, 7504);   // Sell order
+    EXPECT_EQ(capturedFills[3].otherOrderId_, 7502);   // Buy order 2
+    EXPECT_EQ(capturedFills[3].filledQuantity_, 45);    // 45 shares
     
     // Order 3: 25 shares at $153.00 (partial fill of 50)
-    EXPECT_EQ(capturedFills[4].first, 7503);   // Buy order 3
-    EXPECT_EQ(capturedFills[4].second, 25);    // 25 shares (partial)
-    EXPECT_EQ(capturedFills[5].first, 7504);   // Sell order
-    EXPECT_EQ(capturedFills[5].second, 25);    // 25 shares (partial)
+    EXPECT_EQ(capturedFills[4].orderId_, 7503);   // Buy order 3
+    EXPECT_EQ(capturedFills[4].otherOrderId_, 7504);   // Sell order
+    EXPECT_EQ(capturedFills[4].filledQuantity_, 25);    // 25 shares (partial)
+    EXPECT_EQ(capturedFills[5].orderId_, 7504);   // Sell order
+    EXPECT_EQ(capturedFills[5].otherOrderId_, 7503);   // Buy order 3
+    EXPECT_EQ(capturedFills[5].filledQuantity_, 25);    // 25 shares (partial)
 }
 
 TEST_F(OrderBookTest, SubmitNewOrder_LargeOrder_FillsEntireBook) {
@@ -758,17 +780,17 @@ TEST_F(OrderBookTest, SubmitNewOrder_LargeOrder_FillsEntireBook) {
     );
 
     // Capture both fills and cancellation
-    std::vector<std::pair<OrderId, Quantity>> capturedFills;
-    CanceledOrderReport capturedCancel;
+    ExecutionReportCollection capturedFills;
+    OrderCanceledReport capturedCancel;
     
     EXPECT_CALL(*mockReportSink_, submitFills(testing::_))
-        .WillOnce(testing::Invoke([&capturedFills](std::vector<std::pair<OrderId, Quantity>>&& fills) {
+        .WillOnce(testing::Invoke([&capturedFills](ExecutionReportCollection&& fills) {
             capturedFills = std::move(fills);
             return true;
         }));
     
     EXPECT_CALL(*mockReportSink_, submitCanceledOrder(testing::_))
-        .WillOnce(testing::Invoke([&capturedCancel](CanceledOrderReport&& report) {
+        .WillOnce(testing::Invoke([&capturedCancel](OrderCanceledReport&& report) {
             capturedCancel = std::move(report);
             return true;
         }));
@@ -784,18 +806,20 @@ TEST_F(OrderBookTest, SubmitNewOrder_LargeOrder_FillsEntireBook) {
     // Each fill appears twice: once for the sell order, once for the buy order
     for (int i = 0; i < 5; ++i) {
         // Sell order fill
-        EXPECT_EQ(capturedFills[i * 2].first, 8000 + i);     // Sell order ID
-        EXPECT_EQ(capturedFills[i * 2].second, 10);          // 10 shares each
+        EXPECT_EQ(capturedFills[i * 2].orderId_, 8000 + i);     // Sell order ID
+        EXPECT_EQ(capturedFills[i * 2].otherOrderId_, 8005);     // Buy order ID
+        EXPECT_EQ(capturedFills[i * 2].filledQuantity_, 10);          // 10 shares each
         
         // Buy order fill
-        EXPECT_EQ(capturedFills[i * 2 + 1].first, 8005);     // Buy order ID
-        EXPECT_EQ(capturedFills[i * 2 + 1].second, 10);      // 10 shares each
+        EXPECT_EQ(capturedFills[i * 2 + 1].orderId_, 8005);     // Buy order ID
+        EXPECT_EQ(capturedFills[i * 2 + 1].otherOrderId_, 8000 + i);     // Sell order ID
+        EXPECT_EQ(capturedFills[i * 2 + 1].filledQuantity_, 10);      // 10 shares each
     }
 
     // Assert - Verify the cancellation details
-    EXPECT_EQ(capturedCancel.orderId, 8005);                    // Buy order ID
-    EXPECT_EQ(capturedCancel.remainingQuantity, 50);            // 50 shares cancelled (100 - 50 filled)
-    EXPECT_EQ(capturedCancel.reason, CancelReason::Fill_And_Kill); // Correct reason
+    EXPECT_EQ(capturedCancel.orderId_, 8005);                    // Buy order ID
+    EXPECT_EQ(capturedCancel.remainingQuantity_, 50);            // 50 shares cancelled (100 - 50 filled)
+    EXPECT_EQ(capturedCancel.reason_, CancelReason::Fill_And_Kill); // Correct reason
 }
 
 TEST_F(OrderBookTest, SubmitNewOrder_ExactMatch_FillsCompletely) {
@@ -834,9 +858,9 @@ TEST_F(OrderBookTest, SubmitNewOrder_ExactMatch_FillsCompletely) {
     );
 
     // Capture the fills to verify them
-    std::vector<std::pair<OrderId, Quantity>> capturedFills;
+    ExecutionReportCollection capturedFills;
     EXPECT_CALL(*mockReportSink_, submitFills(testing::_))
-        .WillOnce(testing::Invoke([&capturedFills](std::vector<std::pair<OrderId, Quantity>>&& fills) {
+        .WillOnce(testing::Invoke([&capturedFills](ExecutionReportCollection&& fills) {
             capturedFills = std::move(fills);
             return true;
         }));
@@ -853,16 +877,20 @@ TEST_F(OrderBookTest, SubmitNewOrder_ExactMatch_FillsCompletely) {
     ASSERT_EQ(capturedFills.size(), 4);
     
     // Order 1: 60 shares (earlier time)
-    EXPECT_EQ(capturedFills[0].first, 9001);   // Sell order 1
-    EXPECT_EQ(capturedFills[0].second, 60);    // 60 shares
-    EXPECT_EQ(capturedFills[1].first, 9003);   // Buy order
-    EXPECT_EQ(capturedFills[1].second, 60);    // 60 shares
+    EXPECT_EQ(capturedFills[0].orderId_, 9001);   // Sell order 1
+    EXPECT_EQ(capturedFills[0].otherOrderId_, 9003);   // Buy order
+    EXPECT_EQ(capturedFills[0].filledQuantity_, 60);    // 60 shares
+    EXPECT_EQ(capturedFills[1].orderId_, 9003);   // Buy order
+    EXPECT_EQ(capturedFills[1].otherOrderId_, 9001);   // Sell order 1
+    EXPECT_EQ(capturedFills[1].filledQuantity_, 60);    // 60 shares
     
     // Order 2: 40 shares
-    EXPECT_EQ(capturedFills[2].first, 9002);   // Sell order 2
-    EXPECT_EQ(capturedFills[2].second, 40);    // 40 shares
-    EXPECT_EQ(capturedFills[3].first, 9003);   // Buy order
-    EXPECT_EQ(capturedFills[3].second, 40);    // 40 shares
+    EXPECT_EQ(capturedFills[2].orderId_, 9002);   // Sell order 2
+    EXPECT_EQ(capturedFills[2].otherOrderId_, 9003);   // Buy order
+    EXPECT_EQ(capturedFills[2].filledQuantity_, 40);    // 40 shares
+    EXPECT_EQ(capturedFills[3].orderId_, 9003);   // Buy order
+    EXPECT_EQ(capturedFills[3].otherOrderId_, 9002);   // Sell order 2
+    EXPECT_EQ(capturedFills[3].filledQuantity_, 40);    // 40 shares
 }
 
 TEST_F(OrderBookTest, SubmitNewOrder_CrossingSpread_FillsAtBestPrice) {
@@ -890,9 +918,9 @@ TEST_F(OrderBookTest, SubmitNewOrder_CrossingSpread_FillsAtBestPrice) {
     );
 
     // Capture the fills to verify them
-    std::vector<std::pair<OrderId, Quantity>> capturedFills;
+    ExecutionReportCollection capturedFills;
     EXPECT_CALL(*mockReportSink_, submitFills(testing::_))
-        .WillOnce(testing::Invoke([&capturedFills](std::vector<std::pair<OrderId, Quantity>>&& fills) {
+        .WillOnce(testing::Invoke([&capturedFills](ExecutionReportCollection&& fills) {
             capturedFills = std::move(fills);
             return true;
         }));
@@ -902,10 +930,12 @@ TEST_F(OrderBookTest, SubmitNewOrder_CrossingSpread_FillsAtBestPrice) {
 
     // Assert - Verify the fill details
     ASSERT_EQ(capturedFills.size(), 2);  // Should have 2 entries: sell order fill + buy order fill
-    EXPECT_EQ(capturedFills[0].first, 10001);  // Sell order ID
-    EXPECT_EQ(capturedFills[0].second, 30);    // 30 shares filled
-    EXPECT_EQ(capturedFills[1].first, 10002);  // Buy order ID  
-    EXPECT_EQ(capturedFills[1].second, 30);    // 30 shares filled
+    EXPECT_EQ(capturedFills[0].orderId_, 10001);  // Sell order ID
+    EXPECT_EQ(capturedFills[0].otherOrderId_, 10002);  // Buy order ID
+    EXPECT_EQ(capturedFills[0].filledQuantity_, 30);    // 30 shares filled
+    EXPECT_EQ(capturedFills[1].orderId_, 10002);  // Buy order ID  
+    EXPECT_EQ(capturedFills[1].otherOrderId_, 10001);  // Sell order ID
+    EXPECT_EQ(capturedFills[1].filledQuantity_, 30);    // 30 shares filled
 
     // The buy should fill at the sell price ($150.00), not the buy price ($151.00)
 }
@@ -995,18 +1025,16 @@ TEST_F(OrderBookTest, SubmitTopOfBook_WithBothBidAndAsk_ShowsCorrectOrders) {
 
     // Assert - Verify top of book shows both best bid and best ask
     // Best bid (highest buy price)
-    EXPECT_EQ(capturedTopOfBook.bid_order.clientOrderId(), 9001);
-    EXPECT_EQ(capturedTopOfBook.bid_order.quantity(), 100);
-    EXPECT_EQ(capturedTopOfBook.bid_order.openQuantity(), 100);  // No fills yet
-    EXPECT_EQ(capturedTopOfBook.bid_order.price(), toPrice(150.00, TWO_DIGITS_PRICE_SPEC));
-    EXPECT_EQ(capturedTopOfBook.bid_order.side(), Side::Buy);
+    EXPECT_EQ(capturedTopOfBook.bid_order_.orderId_, 9001);
+    EXPECT_EQ(capturedTopOfBook.bid_order_.openQuantity_, 100);
+    EXPECT_EQ(capturedTopOfBook.bid_order_.openQuantity_, 100);  // No fills yet
+    EXPECT_EQ(capturedTopOfBook.bid_order_.price_, toPrice(150.00, TWO_DIGITS_PRICE_SPEC));
     
     // Best ask (lowest sell price)
-    EXPECT_EQ(capturedTopOfBook.ask_order.clientOrderId(), 9002);
-    EXPECT_EQ(capturedTopOfBook.ask_order.quantity(), 75);
-    EXPECT_EQ(capturedTopOfBook.ask_order.openQuantity(), 75);  // No fills yet
-    EXPECT_EQ(capturedTopOfBook.ask_order.price(), toPrice(151.00, TWO_DIGITS_PRICE_SPEC));
-    EXPECT_EQ(capturedTopOfBook.ask_order.side(), Side::Sell);
+    EXPECT_EQ(capturedTopOfBook.ask_order_.orderId_, 9002);
+    EXPECT_EQ(capturedTopOfBook.ask_order_.openQuantity_, 75);
+    EXPECT_EQ(capturedTopOfBook.ask_order_.openQuantity_, 75);  // No fills yet
+    EXPECT_EQ(capturedTopOfBook.ask_order_.price_, toPrice(151.00, TWO_DIGITS_PRICE_SPEC));
 }
 
 TEST_F(OrderBookTest, SubmitTopOfBook_EmptyBook_ReturnsInvalidOrders) {
@@ -1024,8 +1052,8 @@ TEST_F(OrderBookTest, SubmitTopOfBook_EmptyBook_ReturnsInvalidOrders) {
     orderBook_->submitTopOfBook(topOfBookEvent);
 
     // Assert - Verify both bid and ask orders are invalid (default Order objects)
-    EXPECT_FALSE(capturedTopOfBook.bid_order.isValid());
-    EXPECT_FALSE(capturedTopOfBook.ask_order.isValid());
+    EXPECT_FALSE(capturedTopOfBook.bid_order_.isValid());
+    EXPECT_FALSE(capturedTopOfBook.ask_order_.isValid());
 }
 
 } // namespace test

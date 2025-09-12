@@ -27,12 +27,20 @@ public:
     virtual void submitTopOfBook(const TopOfBookEvent& event) = 0;
 };
 
-template <typename ReportSink>
+// TODO: Concept for ReportSink
+template<typename ReportSink> 
+concept ReportSinkConcept = requires(ReportSink sink) {
+  { sink.submitFills(std::move(std::vector<ExecutionReport>())) } -> std::same_as<bool>;
+  { sink.submitCanceledOrder(std::move(OrderCanceledReport())) } -> std::same_as<bool>;
+  { sink.submitTopOfBook(std::move(TopOfBookReport())) } -> std::same_as<bool>;
+};
+
+template <ReportSinkConcept ReportSink>
 class OrderBook : public IOrderBook {
 public:
 
     // TODO: Whole order book creation needs a bit of fixing.
-    explicit OrderBook(ReportSink& reportSink) : reportSink_(reportSink) {}
+    OrderBook(Symbol symbol, std::unique_ptr<ReportSink> reportSink) : symbol_(symbol), reportSink_(std::move(reportSink)) {}
 
 
     bool submitNewOrder(const NewOrderEvent& event) override;
@@ -40,7 +48,8 @@ public:
     void submitTopOfBook(const TopOfBookEvent& event) override;
 
 private:
-  ReportSink& reportSink_;
+  Symbol symbol_;
+  std::unique_ptr<ReportSink> reportSink_;
 
   struct by_price_time_seq {};
   struct by_order_id;           // (userId, clientOrderId) or just clientOrderId
@@ -101,13 +110,13 @@ private:
   void handleAggressiveOrder(const NewOrderEvent& event, auto& sameSideContainer, auto& opposideSideBook, auto cmpFunc);
   bool handleNewOrder(const NewOrderEvent& event, auto& sameSideBook, auto& oppositeSideBook, auto cmpFunc);
 
-  void reportFills(PFillVec&& fills);
+  void reportFills(ExecutionReportCollection&& fills);
   void reportNewOrderCanceled(const NewOrderEvent& event, Quantity filledQuantity);
   void reportOrderCanceled(const Order& order);
 
 };
 
-template <typename ReportSink>
+template <ReportSinkConcept ReportSink>
 bool OrderBook<ReportSink>::submitNewOrder(const NewOrderEvent& event) {
 
   // buy crosses asks: market always crosses; otherwise limit >= best ask
@@ -130,7 +139,7 @@ bool OrderBook<ReportSink>::submitNewOrder(const NewOrderEvent& event) {
   }
 }
 
-template <typename ReportSink>
+template <ReportSinkConcept ReportSink>
 bool OrderBook<ReportSink>::submitCancelOrder(const CancelOrderEvent& event) {
   auto cancelOrder = [this](auto& book, auto orderId) {
     auto& container = book.template get<by_order_id>();
@@ -150,28 +159,28 @@ bool OrderBook<ReportSink>::submitCancelOrder(const CancelOrderEvent& event) {
   return onBid || onAsk;
 }
 
-template <typename ReportSink>
+template <ReportSinkConcept ReportSink>
 void OrderBook<ReportSink>::submitTopOfBook(const TopOfBookEvent& event) {
-  reportSink_.submitTopOfBook(TopOfBookReport{
+  reportSink_->submitTopOfBook(TopOfBookReport{symbol_,
               bidBook_.empty() ? Order() : *bidBook_.begin(), 
               askBook_.empty() ? Order() : *askBook_.begin()});
 }
 
 
 
-template <typename ReportSink>
+template <ReportSinkConcept ReportSink>
 uint64_t OrderBook<ReportSink>::nextSequenceNumber() {
   static uint64_t sequenceNumber = 0;
   return sequenceNumber++;
 }
 
-template <typename ReportSink>
+template <ReportSinkConcept ReportSink>
 bool OrderBook<ReportSink>::isAggressive(const NewOrderEvent& event, auto& container, auto cmpFunc) {
   auto best = container.begin();
   return best != container.end() && cmpFunc(event, best->price());
 }
 
-template <typename ReportSink>
+template <ReportSinkConcept ReportSink>
 bool OrderBook<ReportSink>::handleNewOrder(const NewOrderEvent& event, auto& sameSideBook, auto& oppositeSideBook, auto cmpFunc) {
   auto& sameSideContainer = sameSideBook.template get<by_price_time_seq>();
   auto& oppositeSideContainer = oppositeSideBook.template get<by_price_time_seq>();
@@ -205,25 +214,28 @@ bool OrderBook<ReportSink>::handleNewOrder(const NewOrderEvent& event, auto& sam
   return false;
 }
 
-template <typename ReportSink>
+template <ReportSinkConcept ReportSink>
 void OrderBook<ReportSink>::handleAggressiveOrder(const NewOrderEvent& event, auto& sameSideContainer, auto& opposideSideBook, auto cmpFunc) {
   auto& oppositeSideContainer = opposideSideBook.template get<by_price_time_seq>();
 
-  PFillVec fills;
+  ExecutionReportCollection fills;
   Quantity filledQuantity = 0;
   auto it = oppositeSideContainer.begin(); 
   while (filledQuantity < event.quantity() && it != oppositeSideContainer.end() && cmpFunc(event, it->price())) {
     auto leaveQuantity = event.quantity() - filledQuantity;
 
-    Quantity filled = 0;
+    Quantity filled {};
+    Price fillPrice { INVALID_PRICE };
     bool modified = oppositeSideContainer.modify(it, [&](Order& order) {
       filled = order.fill(leaveQuantity);
+      fillPrice = order.price();
     });
 
     assert(modified);
 
-    fills.emplace_back(it->clientOrderId(), filled);
-    fills.emplace_back(event.clientOrderId(), filled);
+    fills.emplace_back(symbol_, it->clientOrderId(), event.clientOrderId(), filled, fillPrice);
+    fills.emplace_back(symbol_, event.clientOrderId(), it->clientOrderId(), filled, fillPrice);
+
     filledQuantity += filled;
 
     it = it->state() == OrderState::Filled ? oppositeSideContainer.erase(it) : std::next(it);
@@ -241,19 +253,19 @@ void OrderBook<ReportSink>::handleAggressiveOrder(const NewOrderEvent& event, au
   }
 }
 
-template <typename ReportSink>
+template <ReportSinkConcept ReportSink>
 void OrderBook<ReportSink>::reportNewOrderCanceled(const NewOrderEvent& event, Quantity filledQuantity) {
-  reportSink_.submitCanceledOrder(CanceledOrderReport{event.clientOrderId(), event.quantity() - filledQuantity, CancelReason::Fill_And_Kill});
+  reportSink_->submitCanceledOrder(OrderCanceledReport{symbol_, event.clientOrderId(), event.quantity() - filledQuantity, CancelReason::Fill_And_Kill});
 }
 
-template <typename ReportSink>
+template <ReportSinkConcept ReportSink>
 void OrderBook<ReportSink>::reportOrderCanceled(const Order& order) {
-  reportSink_.submitCanceledOrder(CanceledOrderReport{order.clientOrderId(), order.openQuantity(), CancelReason::User_Canceled});
+  reportSink_->submitCanceledOrder(OrderCanceledReport{symbol_, order.clientOrderId(), order.openQuantity(), CancelReason::User_Canceled});
 }
 
-template <typename ReportSink>
-void OrderBook<ReportSink>::reportFills(PFillVec&& fills) {
-  reportSink_.submitFills(std::move(fills));
+template <ReportSinkConcept ReportSink>
+void OrderBook<ReportSink>::reportFills(ExecutionReportCollection&& fills) {
+  reportSink_->submitFills(std::move(fills));
 }
 
 

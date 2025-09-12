@@ -3,6 +3,7 @@
 
 #include <string>
 #include <chrono>
+#include <format>
 
 #include "FixedString.h"
 
@@ -51,7 +52,8 @@ struct PriceSpec {
 };
 
 inline constexpr PriceSpec TWO_DIGITS_PRICE_SPEC = PriceSpec{100, 1};
-  
+inline constexpr double DEFAULT_TICK_SIZE = 0.01; // 1 tick = $0.01
+
 constexpr Price INVALID_PRICE {Price{-1}};
 constexpr Price MARKET_PRICE {Price{std::numeric_limits<int64_t>::max()}};
 
@@ -82,4 +84,31 @@ Price toPrice(double price, const PriceSpec& spec);
   using SequenceNumber = uint64_t;
 
 } // namespace Exchange
+
+namespace std {
+
+  template<class CharT>
+  struct formatter<Exchange::Price, CharT> {
+    // Reuse double's formatter so things like "{:.6f}", "{:>10}", etc. work.
+    bool has_custom_format = false;
+    formatter<double, CharT> base_;
+  
+    constexpr auto parse(basic_format_parse_context<CharT>& ctx) {
+      has_custom_format = (ctx.begin() != ctx.end());
+      return base_.parse(ctx);
+    }
+  
+    template<class FC>
+    auto format(const Exchange::Price& p, FC& fc) const {
+      const double as_double = static_cast<double>(p.ticks) * Exchange::DEFAULT_TICK_SIZE;
+      if (!has_custom_format) {
+        // Default: 2 digits after the decimal point
+        return std::format_to(fc.out(), "{:.4f}",   as_double);
+      }
+      // User provided a format spec; pass it through to double's formatter
+      return base_.format(as_double, fc);
+    }
+  };
+  
+  } // namespace std
 #endif

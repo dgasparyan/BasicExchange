@@ -63,7 +63,8 @@ int main(int argc, char* argv[]) {
       Exchange::ReportSink reportSink;
       Exchange::OrderBookManager::OrderBookMap orderBookMap;
       for (std::string_view symbol : {"AAPL", "GOOGL", "MSFT", "AMZN", "META", "NVDA"}) {
-        orderBookMap.emplace(symbol, std::make_unique<Exchange::OrderBook<Exchange::ReportSink>>(reportSink));
+        auto sink = std::make_unique<Exchange::ReportSink>();
+        orderBookMap.emplace(symbol, std::make_unique<Exchange::OrderBook<Exchange::ReportSink>>(Exchange::Symbol{symbol}, std::move(sink)));
       }
       // const auto numThreads = std  ::max(static_cast<int>(std::thread::hardware_concurrency() / 2), 2);
       const auto numThreads = 3;

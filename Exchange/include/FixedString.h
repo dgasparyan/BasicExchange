@@ -8,6 +8,7 @@
 #include <cstring>
 #include <functional>
 #include <ostream>
+#include <format>
 
 template<std::size_t Capacity, bool NullTerminated = true>
 class FixedString {
@@ -71,6 +72,21 @@ namespace std {
       return std::hash<std::string_view>{}(s.view());
     }
   };
+
+  template<std::size_t Capacity, bool NullTerminated>
+  struct formatter<FixedString<Capacity, NullTerminated>, char> {
+    formatter<std::string_view, char> base_;
+  
+    constexpr auto parse(basic_format_parse_context<char>& ctx) {
+      return base_.parse(ctx); // passthrough alignment/width/precision, etc.
+    }
+  
+    template<class FormatContext>
+    auto format(const FixedString<Capacity, NullTerminated>& fs, FormatContext& fc) const {
+      return base_.format(fs.view(), fc); // zero-copy: uses the stored bytes directly
+    }
+  };
+
 }
 
 static_assert(std::is_trivially_copyable_v<FixedString<32>>);
