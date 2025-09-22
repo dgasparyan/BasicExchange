@@ -61,3 +61,4 @@ TODO:
   -- Decide on what to do with leftover events when stopping.
 
   -- better error/exception handling (like if the queue is full, or event processing throws etc)
+    -- especially around threads, need try/catch atleast

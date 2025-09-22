@@ -7,41 +7,35 @@ namespace Exchange {
 
   namespace {
 
-    constexpr unsigned MAX_BATCH_SIZE = 32;
+    constexpr unsigned MAX_BATCH_SIZE = 128;
 
+
+    
     void backoff(unsigned n) {
       if (n < 32) std::this_thread::yield();
       else std::this_thread::sleep_for(std::chrono::microseconds(1));
-  }
+    }
 
   }
 
 IOrderBookManager::~IOrderBookManager() = default;
 
-OrderBookManager::OrderBookManager(OrderBookManager::OrderBookMap&& map, int numShards) 
+OrderBookManager::OrderBookManager(const std::vector<Symbol>& symbols, IOrderBookFactory& factory, int numShards, int maxSubmitRetries) 
 {  
-  // // at least 2 threads otherwise what's even the point amirite
   numShards = std::max(2, numShards);
   shards_.reserve(numShards);  
   for (int i = 0; i < numShards; ++i) {
-    shards_.emplace_back(std::make_unique<Shard>());
+    shards_.emplace_back(std::make_unique<Shard>(maxSubmitRetries));
   }
 
-  // TOOD: move to ConfigManager and clone the given map
-  for (std::string_view symStr : {"AAPL", "GOOGL", "MSFT", "AMZN", "META", "NVDA"}) {
-    auto symbol = Symbol{symStr};
-    auto it = map.find(symbol);
+  for (const auto& symbol : symbols) {
     auto& shard = shards_[shardIdx(symbol)];
-    if (it == map.end()) {
-      auto sink = std::make_unique<ReportSink>();
-      shard->orderBooks_[symbol] = std::make_unique<OrderBook<ReportSink>>(symbol, std::move(sink));
-    }
-    else {
-      shard->orderBooks_[symbol] = std::move(it->second);
-    }
+    shard->orderBooks_[symbol] = factory.create(symbol);
   }
 
-  std::ranges::for_each(shards_, [](auto& shard) { shard->start(); });
+  std::latch started(numShards);
+  std::ranges::for_each(shards_, [&started](auto& shard) { shard->start(started); });
+  started.wait();
 }
 
 OrderBookManager::~OrderBookManager() {
@@ -53,44 +47,69 @@ void OrderBookManager::stop() {
     for (auto& shard : shards_) {
       shard->stop();
     }
+    for (auto& shard : shards_) {
+      shard->join();
+    }
   }
 }
 
 
-bool OrderBookManager::submit(Event event) {
+SubmitResult OrderBookManager::submit(const Event& event) {
   if (stopRequested_.load()) {
-    return false;
+    return SubmitResult::StopRequested;
   }
 
   auto idx  {shardIdx(event.symbol())};
-  return shards_[idx]->submit(std::move(event));
+  return shards_[idx]->submit(event);
 }
 
 size_t OrderBookManager::shardIdx(Symbol symbol) const {
   return std::hash<Symbol>()(symbol) % shards_.size();
 }
 
-void OrderBookManager::Shard::start() {
-  thread_ = std::jthread([this]() { processEvents(); });
+void OrderBookManager::Shard::start(std::latch& started) {
+  thread_ = std::jthread([this, &started]() { started.count_down(); processEvents();  });
 }
 
 void OrderBookManager::Shard::stop() {
   if (!stopRequested_.exchange(true)) {
     semaphore_.release(1);
+  }
+}
+
+void OrderBookManager::Shard::join() {
+  if (thread_.joinable()) {
     thread_.join();
   }
 }
 
-bool OrderBookManager::Shard::submit(Event&& event) {
+SubmitResult OrderBookManager::Shard::submit(const Event& event) {
   if (stopRequested_.load()) {
-    return false;
+    return SubmitResult::StopRequested;
   }
-  // TODO: review this, moving from the event but might still return false
-  if (!eventQueue_.push(std::move(event))) {
-    return false;
+
+  if (eventQueue_.push(event)) {
+    semaphore_.release(1);
+    return SubmitResult::Success;
   }
-  semaphore_.release(1);
-  return true;
+
+  int numTries = 0;
+  while (true) {
+    if (stopRequested_.load()) {
+      return SubmitResult::StopRequested;
+    }
+    if (eventQueue_.push(event)) {
+      semaphore_.release(1);
+      return SubmitResult::Success;
+    }
+
+
+    backoff(numTries++);
+    if (numTries > maxSubmitRetries_) {
+      return SubmitResult::QueueFull;
+    }
+  }
+
 }
 
 void OrderBookManager::Shard::processEvents() {
@@ -121,7 +140,10 @@ void OrderBookManager::Shard::processEvents() {
       }
     }
 
-    // TODO: decide if want to drain the queue here
+    Event event;
+    while (eventQueue_.pop(event)) {
+      processEvent(std::move(event));
+    }
 }
 
 void OrderBookManager::Shard::processEvent(Event&& arg) {
