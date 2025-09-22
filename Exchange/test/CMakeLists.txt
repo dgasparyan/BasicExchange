@@ -21,6 +21,7 @@ set(TEST_SOURCES
     test_event_parser.cpp
     test_events.cpp
     test_orderbook.cpp
+    test_obm_concurrency.cpp
 )
 
 # Create test executable
@@ -43,6 +44,7 @@ target_sources(run_tests PRIVATE
     ../src/OrderBook.cpp
     ../src/Order.cpp
     ../src/ReportSink.cpp
+    ../src/ConfigManager.cpp
 )
 
 # Enable testing

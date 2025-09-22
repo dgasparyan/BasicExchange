@@ -26,8 +26,14 @@ public:
     virtual bool submitCancelOrder(const CancelOrderEvent& event) = 0;
     virtual void submitTopOfBook(const TopOfBookEvent& event) = 0;
 };
+  
 
-// TODO: Concept for ReportSink
+class IOrderBookFactory {
+  public:
+      virtual ~IOrderBookFactory() = 0;
+      virtual std::unique_ptr<IOrderBook> create(Symbol symbol) = 0;
+  };
+
 template<typename ReportSink> 
 concept ReportSinkConcept = requires(ReportSink sink) {
   { sink.submitFills(std::move(std::vector<ExecutionReport>())) } -> std::same_as<bool>;
@@ -116,8 +122,18 @@ private:
 
 };
 
+template <ReportSinkConcept Sink>
+class OrderBookFactory : public IOrderBookFactory {
+  public:
+    std::unique_ptr<IOrderBook> create(Symbol symbol) override {
+      return std::make_unique<OrderBook<Sink>>(symbol, std::make_unique<Sink>());
+    }
+};
+
+
 template <ReportSinkConcept ReportSink>
-bool OrderBook<ReportSink>::submitNewOrder(const NewOrderEvent& event) {
+bool OrderBook<ReportSink>::submitNewOrder(const NewOrderEvent
+  & event) {
 
   // buy crosses asks: market always crosses; otherwise limit >= best ask
   auto crossesBuy = [](const NewOrderEvent& ev, Price bestAsk) noexcept {

@@ -2,6 +2,7 @@
 build/
 */build/
 Exchange/build/
+Exchange/build_release/
 
 # Compiled object files
 *.o

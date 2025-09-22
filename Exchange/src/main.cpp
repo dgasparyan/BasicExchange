@@ -2,13 +2,16 @@
 #include <memory>
 #include <string>
 #include <csignal>
-#include <thread>
 
 #include "SocketUtils.h"
 #include "Event.h"
 #include "Exchange.h"
 #include "UDPListener.h"
-
+#include "ReportSink.h"
+#include "OrderBookManager.h"
+#include "Exchange.h"
+#include "ConfigManager.h"
+#include "EventParser.h"
 #include "OrderBook.h"
 
 int port;
@@ -58,18 +61,14 @@ int main(int argc, char* argv[]) {
     {
       Exchange::CsvEventParser eventParser;
       Exchange::UDPListener listener(port);
-
-      // TODO: this whole creation needs to be fixed, should be using one report sink per book to reduce contention
-      Exchange::ReportSink reportSink;
-      Exchange::OrderBookManager::OrderBookMap orderBookMap;
-      for (std::string_view symbol : {"AAPL", "GOOGL", "MSFT", "AMZN", "META", "NVDA"}) {
-        auto sink = std::make_unique<Exchange::ReportSink>();
-        orderBookMap.emplace(symbol, std::make_unique<Exchange::OrderBook<Exchange::ReportSink>>(Exchange::Symbol{symbol}, std::move(sink)));
-      }
+      Exchange::OrderBookFactory<Exchange::ReportSink> obFactory;
       // const auto numThreads = std  ::max(static_cast<int>(std::thread::hardware_concurrency() / 2), 2);
       const auto numThreads = 3;
       
-      Exchange::OrderBookManager orderBookManager {std::move(orderBookMap), numThreads};
+      Exchange::OrderBookManager orderBookManager {
+                                              Exchange::ConfigManager::instance().getSupportedSymbols(), 
+                                              obFactory, 
+                                              numThreads};
       Exchange::Exchange  exchange(listener, eventParser, orderBookManager);
     
       std::cout << "UDP Exchange Server running on port " << port << std::endl;

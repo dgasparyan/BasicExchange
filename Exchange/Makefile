@@ -3,6 +3,10 @@ CXXFLAGS = -std=c++23 -Wall -Wextra -pedantic -g -O0 -Iinclude -fexperimental-li
 # -fexperimental-library is needed for stop_source and stop_token on Apple Clange 
 
 
+# Release flags (used by test-release)
+CXXFLAGS_RELEASE = -std=c++23 -Wall -Wextra -pedantic -O3 -DNDEBUG -Iinclude -fexperimental-library -I$(BOOST_INCLUDE_DIR)
+TEST_CXXFLAGS_RELEASE = $(CXXFLAGS_RELEASE) -I$(GTEST_INCLUDE_DIR) -DUNIT_TESTS
+
 # Boost library settings
 BOOST_ROOT ?= /opt/homebrew
 BOOST_INCLUDE_DIR = $(BOOST_ROOT)/include
@@ -79,8 +83,8 @@ run: all
 	./$(TARGET) $(PORT)
 
 test: $(TEST_TARGET)
-	@echo "Running tests..."
-	./$(TEST_TARGET)
+	@echo "Running tests$(if $(FILTER), with filter '$(FILTER)',)..."
+	$(if $(FILTER),./$(TEST_TARGET) --gtest_filter=$(FILTER),./$(TEST_TARGET))
 
 test-verbose: $(TEST_TARGET)
 	@echo "Running tests with verbose output..."
@@ -89,6 +93,18 @@ test-verbose: $(TEST_TARGET)
 test-filter: $(TEST_TARGET)
 	@echo "Running tests with filter..."
 	./$(TEST_TARGET) --gtest_filter=$(FILTER)
+
+
+# Build and run tests with release optimization flags
+# Build and run tests with release optimization flags in a separate build dir
+test-release:
+	$(MAKE) $(if $(FILTER),test-filter,test) \
+		BUILD_DIR=build_release \
+		OBJ_DIR=build_release/obj \
+		BIN_DIR=build_release/bin \
+		CXXFLAGS="$(CXXFLAGS_RELEASE)" \
+		TEST_CXXFLAGS="$(TEST_CXXFLAGS_RELEASE)" \
+		FILTER="$(FILTER)"
 
 clean:
 	rm -rf $(BUILD_DIR)
@@ -100,6 +116,7 @@ help:
 	@echo "  all         - Build the program (default)"
 	@echo "  run         - Build and run the program"
 	@echo "  test        - Build and run all tests"
+	@echo "  test-release- Build and run tests with -O3 -DNDEBUG"
 	@echo "  test-verbose- Run tests with verbose output"
 	@echo "  test-filter - Run tests with filter (set FILTER=pattern)"
 	@echo "  force-test  - Clean build and run all tests"

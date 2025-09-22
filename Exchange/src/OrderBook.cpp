@@ -6,6 +6,8 @@ namespace Exchange {
 
 IOrderBook::~IOrderBook() = default;
 
+IOrderBookFactory::~IOrderBookFactory() = default;
+
 
 
 } // namespace Exchange 
