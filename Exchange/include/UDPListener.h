@@ -13,7 +13,7 @@ namespace Exchange {
 
 class UDPListener;
 
-class UdpSubscriptionHandle : public SubscriptionHandle {
+class [[nodiscard]] UdpSubscriptionHandle : public SubscriptionHandle {
 public:
   UdpSubscriptionHandle(UDPListener* listener, int handle);
   ~UdpSubscriptionHandle();

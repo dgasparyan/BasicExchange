@@ -30,6 +30,8 @@ namespace Exchange {
 
     virtual SubmitResult submit(const Event& event) = 0;
 
+    virtual void stop() = 0;
+
   };
 
 class OrderBookManager : public IOrderBookManager {
@@ -44,7 +46,7 @@ public:
 
     SubmitResult submit(const Event& event) override;
 
-    void stop();
+    void stop() override;
 
 private:
 

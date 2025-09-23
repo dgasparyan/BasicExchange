@@ -164,7 +164,7 @@ TEST(OBMConcurrencyTest, Stop_race) {
 
   TestOrderBookFactory factory;
   constexpr int numThreads = 5;
-  OrderBookManager obm(kTestSymbols, factory, numThreads);
+  OrderBookManager obm(kTestSymbols, factory, numThreads, 10);
 
   constexpr int kNumEvents = 250;
   constexpr int kNumThreads = 5;
@@ -172,23 +172,36 @@ TEST(OBMConcurrencyTest, Stop_race) {
   std::vector<std::jthread> threads;
   std::atomic<int> numStopRequested {0};
   std::atomic<int> numSent {0};
+  std::latch started(kNumThreads);
+  std::atomic<bool> stopRequested {false};
   for (int i = 0; i < kNumThreads; ++i) {
     threads.emplace_back([&]() {
+      started.arrive_and_wait();
+      int numSent_ = 0;
+      int numStopRequested_ = 0;
       for (int i = 0; i < kNumEvents; ++i) {
         auto symbol = i % 2 == 0 ? Symbol{"AAPL"} : Symbol{"MSFT"};
         auto result = obm.submit(makeNewOrder(symbol));
         if (result == SubmitResult::Success) {
-          numSent.fetch_add(1);
+          numSent_++;
         } else if (result == SubmitResult::StopRequested) {
-          numStopRequested.fetch_add(1);
+          numStopRequested_++;
+        }
+
+        if (numSent_ % 50 == 0) {
+          stopRequested.store(true, std::memory_order_release);
+          stopRequested.notify_one();
         }
       }
+      numSent.fetch_add(numSent_);
+      numStopRequested.fetch_add(numStopRequested_);
     });
   }
 
-  if (numSent.load() > 0) {
-    obm.stop();
+  while (!stopRequested.load(std::memory_order_acquire)) {
+    stopRequested.wait(false, std::memory_order_acquire);
   }
+  obm.stop();
 
   for (auto& thread : threads) {
     thread.join();
@@ -198,6 +211,8 @@ TEST(OBMConcurrencyTest, Stop_race) {
     GTEST_SKIP() << "All events were submitted before stop; test inconclusive";
   }
 
+  std::cout << "numStopRequested: " << numStopRequested.load() << std::endl;
+  std::cout << "numSent: " << numSent.load() << std::endl;
   auto aaplEvents = factory.mbMap_["AAPL"_sym]->newOrderCalls_.load(std::memory_order_relaxed);
   auto msftEvents = factory.mbMap_["MSFT"_sym]->newOrderCalls_.load(std::memory_order_relaxed);
   EXPECT_EQ(aaplEvents + msftEvents + numStopRequested.load(), kNumEvents * kNumThreads);
