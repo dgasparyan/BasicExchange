@@ -177,7 +177,7 @@ bool OrderBook<ReportSink>::submitCancelOrder(const CancelOrderEvent& event) {
 
 template <ReportSinkConcept ReportSink>
 void OrderBook<ReportSink>::submitTopOfBook(const TopOfBookEvent& event) {
-  reportSink_->submitTopOfBook(TopOfBookReport{symbol_,
+  reportSink_->submitTopOfBook(TopOfBookReport{symbol_, event.clientOrderId(),
               bidBook_.empty() ? Order() : *bidBook_.begin(), 
               askBook_.empty() ? Order() : *askBook_.begin()});
 }

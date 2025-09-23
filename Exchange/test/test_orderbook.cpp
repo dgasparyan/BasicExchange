@@ -61,7 +61,8 @@ TEST_F(OrderBookTest, SubmitNewOrder_BuyLimitOrder_AddsToBidBook) {
 
     orderBook_->submitTopOfBook(topOfBookEvent);
 
-    // Assert - Verify top of book shows correct bid order
+    // Assert - Verify top of book shows correct bid order and request id
+    EXPECT_EQ(capturedTopOfBook.requestId_, 1001);
     EXPECT_EQ(capturedTopOfBook.bid_order_.orderId_, 1001);
     EXPECT_EQ(capturedTopOfBook.bid_order_.openQuantity_, 100);
     EXPECT_EQ(capturedTopOfBook.bid_order_.openQuantity_, 100);  // No fills yet
@@ -115,7 +116,8 @@ TEST_F(OrderBookTest, SubmitNewOrder_SellLimitOrder_AddsToAskBook) {
 
     orderBook_->submitTopOfBook(topOfBookEvent);
 
-    // Assert - Verify top of book shows correct ask order
+    // Assert - Verify top of book shows correct ask order and request id
+    EXPECT_EQ(capturedTopOfBook.requestId_, 1002);
     EXPECT_EQ(capturedTopOfBook.ask_order_.orderId_, 1002);
     EXPECT_EQ(capturedTopOfBook.ask_order_.openQuantity_, 50);
     EXPECT_EQ(capturedTopOfBook.ask_order_.openQuantity_, 50);  // No fills yet
@@ -1023,7 +1025,8 @@ TEST_F(OrderBookTest, SubmitTopOfBook_WithBothBidAndAsk_ShowsCorrectOrders) {
 
     orderBook_->submitTopOfBook(topOfBookEvent);
 
-    // Assert - Verify top of book shows both best bid and best ask
+    // Assert - Verify request id and both best bid and best ask
+    EXPECT_EQ(capturedTopOfBook.requestId_, 9003);
     // Best bid (highest buy price)
     EXPECT_EQ(capturedTopOfBook.bid_order_.orderId_, 9001);
     EXPECT_EQ(capturedTopOfBook.bid_order_.openQuantity_, 100);

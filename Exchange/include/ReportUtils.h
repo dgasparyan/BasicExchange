@@ -49,11 +49,12 @@ struct SingleOrderReport {
 
 struct TopOfBookReport {
   TopOfBookReport() = default;
-  TopOfBookReport(Symbol symbol, const Order& bid, const Order& ask);
+  TopOfBookReport(Symbol symbol, OrderId requestId, const Order& bid, const Order& ask);
 
   bool isValid() const { return symbol_ != INVALID_SYMBOL; }
 
   Symbol symbol_ {INVALID_SYMBOL};
+  OrderId requestId_ {INVALID_ORDER_ID};
   SingleOrderReport bid_order_ {}; 
   SingleOrderReport ask_order_ {};
 };
@@ -153,8 +154,8 @@ struct formatter<Exchange::TopOfBookReport, char> {
   auto format(const Exchange::TopOfBookReport& r, FC& fc) const {
     std::string tmp;
     std::format_to(std::back_inserter(tmp),
-                   "TopOfBookReport{{symbol={}, bid={}, ask={}}}",
-                   r.symbol_, r.bid_order_, r.ask_order_);
+                   "TopOfBookReport{{symbol={}, requestId={}, bid={}, ask={}}}",
+                   r.symbol_, r.requestId_, r.bid_order_, r.ask_order_);
     return base_.format(std::string_view(tmp), fc);
   }
 };
