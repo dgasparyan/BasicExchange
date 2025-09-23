@@ -38,11 +38,11 @@ OrderBookManager::OrderBookManager(const std::vector<Symbol>& symbols, IOrderBoo
   started.wait();
 }
 
-OrderBookManager::~OrderBookManager() {
+OrderBookManager::~OrderBookManager() noexcept {
   stop();
 }
 
-void OrderBookManager::stop() {
+void OrderBookManager::stop() noexcept {
   if (!stopRequested_.exchange(true)) {
     for (auto& shard : shards_) {
       shard->stop();
@@ -71,13 +71,13 @@ void OrderBookManager::Shard::start(std::latch& started) {
   thread_ = std::jthread([this, &started]() { started.count_down(); processEvents();  });
 }
 
-void OrderBookManager::Shard::stop() {
+void OrderBookManager::Shard::stop() noexcept {
   if (!stopRequested_.exchange(true)) {
     semaphore_.release(1);
   }
 }
 
-void OrderBookManager::Shard::join() {
+void OrderBookManager::Shard::join() noexcept {
   if (thread_.joinable()) {
     thread_.join();
   }
@@ -112,38 +112,53 @@ SubmitResult OrderBookManager::Shard::submit(const Event& event) {
 
 }
 
-void OrderBookManager::Shard::processEvents() {
-  while (true) {
-      semaphore_.acquire();
-      if (stopRequested_.load()) {
-        break;
+void OrderBookManager::Shard::processEvents() noexcept {
+  try {
+    auto handleSafely = [this](Event&& ev) {
+      try {
+        processEvent(std::move(ev));
+      } catch (const std::exception& e) {
+        std::cerr << "OrderBookManager::Shard::processEvents: error processing event: "
+                  << e.what() << std::endl;
+      } catch (...) {
+        std::cerr << "OrderBookManager::Shard::processEvents: unknown error processing event"
+                  << std::endl;
+      }
+    };
+    while (true) {
+        semaphore_.acquire();
+        if (stopRequested_.load()) {
+          break;
+        }
+
+        Event event;
+
+        unsigned int spinCount {0};
+        while (!eventQueue_.pop(event)) {
+          backoff(spinCount++);
+        }
+        handleSafely(std::move(event));
+
+        // opportunistic batching
+        unsigned int grabbed {0};
+        while (!stopRequested_.load() && grabbed < MAX_BATCH_SIZE && semaphore_.try_acquire()) {
+            if (stopRequested_.load()) {
+              semaphore_.release(); // return the token so a blocked worker can wake
+              break;
+            }
+
+            if (eventQueue_.pop(event)) { handleSafely(std::move(event)); ++grabbed; }
+            else { semaphore_.release(1); break; } // return token if we lost the race
+        }
       }
 
       Event event;
-
-      unsigned int spinCount {0};
-      while (!eventQueue_.pop(event)) {
-        backoff(spinCount++);
+      while (eventQueue_.pop(event)) {
+        handleSafely(std::move(event));
       }
-      processEvent(std::move(event));
-
-      // opportunistic batching
-      unsigned int grabbed {0};
-      while (!stopRequested_.load() && grabbed < MAX_BATCH_SIZE && semaphore_.try_acquire()) {
-          if (stopRequested_.load()) {
-            semaphore_.release(); // return the token so a blocked worker can wake
-            break;
-          }
-
-          if (eventQueue_.pop(event)) { processEvent(std::move(event)); ++grabbed; }
-          else { semaphore_.release(1); break; } // return token if we lost the race
-      }
-    }
-
-    Event event;
-    while (eventQueue_.pop(event)) {
-      processEvent(std::move(event));
-    }
+  } catch (const std::exception& e) {
+    std::cerr << "OrderBookManager::Shard::processEvents: " << e.what() << std::endl;
+  }
 }
 
 void OrderBookManager::Shard::processEvent(Event&& arg) {

@@ -21,7 +21,7 @@ set(TEST_SOURCES
     test_event_parser.cpp
     test_events.cpp
     test_orderbook.cpp
-    test_obm_concurrency.cpp
+    test_obm.cpp
 )
 
 # Create test executable

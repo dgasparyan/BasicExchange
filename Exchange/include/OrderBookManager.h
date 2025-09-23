@@ -30,7 +30,7 @@ namespace Exchange {
 
     virtual SubmitResult submit(const Event& event) = 0;
 
-    virtual void stop() = 0;
+    virtual void stop() noexcept = 0;
 
   };
 
@@ -42,11 +42,11 @@ public:
       IOrderBookFactory& factory, int numShards = std::thread::hardware_concurrency() / 2,
                                   int maxSubmitRetries = 64);
 
-    ~OrderBookManager();
+    ~OrderBookManager() noexcept;
 
     SubmitResult submit(const Event& event) override;
 
-    void stop() override;
+    void stop() noexcept override;
 
 private:
 
@@ -55,12 +55,12 @@ private:
       explicit Shard(int maxSubmitRetries) : maxSubmitRetries_(maxSubmitRetries) {}
 
       void start(std::latch& started);
-      void stop();
-      void join();
+      void stop() noexcept;
+      void join() noexcept;
 
 
       SubmitResult submit(const Event& event);
-      void processEvents();
+      void processEvents() noexcept;
       void processEvent(Event&& event);
 
 

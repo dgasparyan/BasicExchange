@@ -264,7 +264,7 @@ void OrderBook<ReportSink>::handleAggressiveOrder(const NewOrderEvent& event, au
     if (it == oppositeSideContainer.end()) {
       reportNewOrderCanceled(event, filledQuantity);
     } else {
-      sameSideContainer.emplace(event, nextSequenceNumber(), filledQuantity).second;
+      sameSideContainer.emplace(event, nextSequenceNumber(), filledQuantity);
     }
   }
 }

@@ -308,6 +308,49 @@ TEST(OBMConcurrencyTest, Heavy_submit_load_might_drop_with_low_retries) {
 }
 
 
+TEST(OBMTest, Exception_in_orderbook_does_not_stop_processing) {
+
+  class ThrowOnceOrderBook : public IOrderBook {
+  public:
+    std::atomic<bool> throwNext {true};
+    std::atomic<int> newOrderCalls {0};
+
+    bool submitNewOrder(const NewOrderEvent&) override {
+      if (throwNext.exchange(false)) {
+        throw std::runtime_error("boom");
+      }
+      newOrderCalls.fetch_add(1, std::memory_order_relaxed);
+      return true;
+    }
+    bool submitCancelOrder(const CancelOrderEvent&) override { return true; }
+    void submitTopOfBook(const TopOfBookEvent&) override {}
+  };
+
+  class ThrowingFactory : public IOrderBookFactory {
+  public:
+    std::unique_ptr<IOrderBook> create(Symbol) override {
+      auto ob = std::make_unique<ThrowOnceOrderBook>();
+      book = ob.get();
+      return ob;
+    }
+    ThrowOnceOrderBook* book {nullptr};
+  };
+
+  ThrowingFactory factory;
+  const std::vector<Symbol> symbols {"AAPL"_sym};
+  constexpr int numThreads = 3;
+  OrderBookManager obm(symbols, factory, numThreads);
+
+  (void)obm.submit(makeNewOrder("AAPL"_sym));
+  (void)obm.submit(makeNewOrder("AAPL"_sym));
+
+  obm.stop();
+
+  ASSERT_NE(factory.book, nullptr);
+  EXPECT_EQ(factory.book->newOrderCalls.load(std::memory_order_relaxed), 1);
+}
+
+
 
 } // namespace test
 } // namespace Exchange

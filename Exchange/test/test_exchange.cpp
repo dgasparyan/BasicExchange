@@ -36,7 +36,7 @@ public:
 class MockOrderBookManager : public IOrderBookManager {
 public:
   MOCK_METHOD(SubmitResult, submit, (const Event&), (override));
-  MOCK_METHOD(void, stop, (), (override));
+  MOCK_METHOD(void, stop, (), (noexcept, override));
 };
 
 // Utility to create Exchange with mocks and capture the subscription callback
